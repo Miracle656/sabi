@@ -268,8 +268,8 @@ function Topbar(props: {
   const live = props.mode === "live";
   return (
     <header className="shrink-0 border-b border-line">
-      <div className="flex h-[var(--topbar-h)] items-center gap-2 px-4 sm:gap-3 sm:px-6 lg:px-10">
-        <div className="flex min-w-0 shrink items-center gap-2 sm:gap-3">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-4 py-2.5 sm:h-[var(--topbar-h)] sm:flex-nowrap sm:gap-3 sm:px-6 sm:py-0 lg:px-10">
+        <div className="flex min-w-0 shrink items-center gap-2 whitespace-nowrap sm:gap-3">
           <Mark />
           <span className="display text-[19px] font-medium">Sabi</span>
           <span className="hidden h-[18px] w-px bg-line2 md:block" />
@@ -296,6 +296,7 @@ function Topbar(props: {
 
         <span className="grow" />
 
+        <div className="ml-auto flex min-w-0 items-center gap-2 sm:ml-0 sm:gap-3">
         {/* Anonymous writes still carry SABI_REPORTER, so the chip stays
             visible until someone actually signs in - sign-in being available
             must not hide who unattributed findings would be blamed on. */}
@@ -341,6 +342,7 @@ function Topbar(props: {
           </svg>
           Ledger
         </button>
+        </div>
       </div>
     </header>
   );
@@ -404,7 +406,7 @@ function FirstRun({
 
   return (
     <div className="flex flex-col pt-6">
-      <h1 className="display max-w-[15ch] text-[38px] font-normal leading-[1.08] sm:text-[46px] lg:text-[52px]">
+      <h1 className="display max-w-[15ch] text-[33px] font-normal leading-[1.08] sm:text-[46px] lg:text-[52px]">
         Ask before you burn a day on a landmine somebody don already hit.
       </h1>
       <p className="mt-5 max-w-[58ch] text-[16px] leading-relaxed text-muted">
@@ -425,7 +427,7 @@ function FirstRun({
         ))}
       </div>
 
-      <section className="mt-12">
+      <section className="mt-9 sm:mt-12">
         <div className="flex items-baseline justify-between border-b border-line pb-3">
           <h2 className="text-[13px] font-medium">Some of wetin the community don verify</h2>
           <span className="text-[12px] text-faint">
