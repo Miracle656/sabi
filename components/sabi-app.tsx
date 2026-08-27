@@ -414,6 +414,35 @@ function FirstRun({
         verify before e answer, and e only dey keep wetin you confirm say you reproduce yourself.
       </p>
 
+      {/* How e dey work - three steps, hairline discipline, no colour spent. */}
+      <ol className="mt-7 grid max-w-[58ch] gap-4 sm:grid-cols-3 sm:gap-6">
+        {[
+          {
+            n: "01",
+            t: "Ask",
+            d: "Describe your blocker. Sabi go check community memory first and cite who verify wetin, and when.",
+          },
+          {
+            n: "02",
+            t: "Verify",
+            d: "Reproduce the issue or the fix yourself. Second-hand gist no dey enter - na you be the proof.",
+          },
+          {
+            n: "03",
+            t: "Store",
+            d: "Talk say you confirm am. Sabi go keep am on Walrus with your name and date, for the next person.",
+          },
+        ].map((s) => (
+          <li key={s.n} className="border-t border-line pt-3">
+            <div className="flex items-baseline gap-2">
+              <span className="mono text-[11px] text-faint">{s.n}</span>
+              <span className="text-[13.5px] font-medium">{s.t}</span>
+            </div>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-muted">{s.d}</p>
+          </li>
+        ))}
+      </ol>
+
       <div className="mt-7 flex flex-wrap gap-2">
         {EXAMPLES.map((ex) => (
           <button

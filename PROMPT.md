@@ -150,6 +150,12 @@ models in this app (Vercel AI SDK), and `pnpm mcp` serves the same two tools plu
 this prompt over stdio to any MCP client (Claude Desktop, Cursor, ...) — the same
 community brain from inside whatever tool a member already uses.
 
+The community itself is a parameter too. Every dev community has landmines; we
+pointed the rules at ours first because we could verify every seed finding
+ourselves. Fork the repo, change `MEMWAL_NAMESPACE` and the community line of
+this prompt, mint a shared account — and any community (or team) gets its own
+brain under the same rules.
+
 ## Honest limits
 
 - Verification is the community's honour system; the prompt is the gatekeeper and
