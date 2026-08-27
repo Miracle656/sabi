@@ -15,7 +15,13 @@ import {
   toFinding,
   todayISO,
 } from "../lib/findings";
-import { searchFindings, storeFinding, mode, defaultNamespace } from "../lib/memwal";
+import {
+  defaultNamespace,
+  explainStoreFailure,
+  mode,
+  searchFindings,
+  storeFinding,
+} from "../lib/memwal";
 
 function text(value: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] };
@@ -102,7 +108,7 @@ export function registerSabi(server: McpServer): void {
           finding,
         });
       } catch (err) {
-        return failure(`store failed: ${describe(err)}`);
+        return failure(`store failed: ${await explainStoreFailure(err)}`);
       }
     },
   );

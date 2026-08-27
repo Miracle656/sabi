@@ -25,7 +25,7 @@ import {
   toFinding,
   todayISO,
 } from "@/lib/findings";
-import { searchFindings, storeFinding } from "@/lib/memwal";
+import { explainStoreFailure, searchFindings, storeFinding } from "@/lib/memwal";
 
 export const maxDuration = 120;
 
@@ -144,7 +144,7 @@ export async function POST(req: Request) {
             finding,
           };
         } catch (err) {
-          return { status: "error" as const, error: describe(err) };
+          return { status: "error" as const, error: await explainStoreFailure(err) };
         }
       },
     }),

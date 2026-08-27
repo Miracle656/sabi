@@ -310,3 +310,24 @@ export async function health() {
   const c = await client();
   return c.health();
 }
+
+/**
+ * When a store fails, ask the relayer whether writes are even possible right
+ * now. `health()` exposes `write_ready:false` during platform-side outages
+ * (seen live 2026-08-27: "Memory encryption backend is unavailable") - an
+ * honest "the platform is down, your finding is not lost" beats a scary
+ * credentials error.
+ */
+export async function explainStoreFailure(err: unknown): Promise<string> {
+  const base = err instanceof Error ? err.message : String(err);
+  if (mode() === "mock") return base;
+  try {
+    const h = (await health()) as { write_ready?: boolean };
+    if (h.write_ready === false) {
+      return `The Walrus Memory relayer is temporarily not accepting writes (write_ready:false - platform-side outage, not your credentials). Nothing was stored; keep the finding and retry shortly. Underlying error: ${base}`;
+    }
+  } catch {
+    /* health itself unreachable - the base error stands */
+  }
+  return base;
+}
