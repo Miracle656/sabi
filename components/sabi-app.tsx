@@ -829,7 +829,7 @@ function Ledger({
           <div className="flex flex-col gap-0.5">
             <span className="display text-[22px] font-medium">{stores}</span>
             <span className="text-[11.5px] text-faint">
-              {mock ? "mock writes" : "on Walrus"}
+              {mock ? "mock writes this session" : "stored this session"}
               {unsettled > 0 && <span className="text-warn"> · {unsettled} not settled</span>}
             </span>
           </div>

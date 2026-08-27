@@ -187,13 +187,18 @@ export async function network(): Promise<Network> {
  * problem and must surface.
  */
 async function withAuthRetry<T>(fn: () => Promise<T>): Promise<T> {
-  try {
-    return await fn();
-  } catch (err) {
-    if ((err as { status?: number }).status !== 401) throw err;
-    await new Promise((r) => setTimeout(r, 1_500));
-    return fn();
+  // Production showed the warm-up takes ~5s: a failure at :44 succeeded at :49.
+  // Two retries totalling 5s of waiting cover it; a third 401 is real.
+  const waits = [1_500, 3_500];
+  for (const wait of waits) {
+    try {
+      return await fn();
+    } catch (err) {
+      if ((err as { status?: number }).status !== 401) throw err;
+      await new Promise((r) => setTimeout(r, wait));
+    }
   }
+  return fn();
 }
 
 export interface StoreResult {
