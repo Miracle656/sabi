@@ -83,7 +83,13 @@ export function SabiApp({
 }: SabiAppProps) {
   const [modelId, setModelId] = useState(models[0]?.id ?? "");
   const [input, setInput] = useState("");
-  const [wallOpen, setWallOpen] = useState(true);
+  // Starts closed so the phone slide-over never covers first paint; desktops
+  // get the rail right after mount (initializing from matchMedia in useState
+  // would render differently on server and client).
+  const [wallOpen, setWallOpen] = useState(false);
+  useEffect(() => {
+    if (window.matchMedia("(min-width: 1024px)").matches) setWallOpen(true);
+  }, []);
   const transport = useMemo(() => new DefaultChatTransport({ api: "/api/chat" }), []);
   const { messages, sendMessage, status, error, stop } = useChat({ transport });
   const busy = status === "submitted" || status === "streaming";
@@ -235,15 +241,23 @@ export function SabiApp({
         </main>
 
         {wallOpen && (
-          <aside className="hidden w-[var(--rail-w)] shrink-0 border-l border-line lg:block">
-            <Ledger
-              entries={ledger}
-              network={network}
-              namespace={namespace}
-              mock={mode === "mock"}
-              resolved={resolved}
+          <>
+            <div
+              className="fixed inset-0 z-30 bg-black/40 lg:hidden"
+              onClick={() => setWallOpen(false)}
+              aria-hidden="true"
             />
-          </aside>
+            <aside className="fixed inset-y-0 right-0 z-40 w-[86vw] max-w-[360px] border-l border-line bg-[var(--paper)] lg:static lg:z-auto lg:w-[var(--rail-w)] lg:max-w-none lg:shrink-0">
+              <Ledger
+                entries={ledger}
+                network={network}
+                namespace={namespace}
+                mock={mode === "mock"}
+                resolved={resolved}
+                onClose={() => setWallOpen(false)}
+              />
+            </aside>
+          </>
         )}
       </div>
     </div>
@@ -332,7 +346,7 @@ function Topbar(props: {
           onClick={props.onToggleWall}
           title={props.wallOpen ? "Hide the ledger" : "Show the ledger"}
           aria-pressed={props.wallOpen}
-          className={`hidden h-8 items-center gap-2 rounded-[var(--r)] border border-line2 px-2.5 text-[13px] transition-colors hover:bg-soft lg:inline-flex ${
+          className={`inline-flex h-8 items-center gap-2 rounded-[var(--r)] border border-line2 px-2.5 text-[13px] transition-colors hover:bg-soft ${
             props.wallOpen ? "text-ink" : "text-faint"
           }`}
         >
@@ -340,7 +354,7 @@ function Topbar(props: {
             <rect x="3" y="4" width="18" height="16" rx="2" />
             <path d="M15 4v16" />
           </svg>
-          Ledger
+          <span className="hidden sm:inline">Ledger</span>
         </button>
         </div>
       </div>
@@ -828,12 +842,14 @@ function Ledger({
   namespace,
   mock,
   resolved,
+  onClose,
 }: {
   entries: LedgerEntry[];
   network: Network;
   namespace: string;
   mock: boolean;
   resolved: Record<string, ResolvedWrite>;
+  onClose: () => void;
 }) {
   const recalls = entries.filter((e) => e.part.type === RECALL).length;
   // Only a blob that actually landed counts as a write. Refused, failed and
@@ -850,7 +866,17 @@ function Ledger({
       <div className="flex flex-col gap-3.5 border-b border-line px-6 py-5">
         <div className="flex items-baseline justify-between">
           <span className="display text-[14px] font-medium">Ledger</span>
-          <span className="mono text-[11.5px] text-faint">ns:{namespace}</span>
+          <span className="flex items-center gap-3">
+            <span className="mono text-[11.5px] text-faint">ns:{namespace}</span>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close the ledger"
+              className="text-[16px] leading-none text-faint hover:text-ink lg:hidden"
+            >
+              &times;
+            </button>
+          </span>
         </div>
         <div className="nums grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-0.5">
