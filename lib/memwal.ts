@@ -186,20 +186,42 @@ export async function network(): Promise<Network> {
  * replays that. One retry, only on 401 - a second 401 is a real credential
  * problem and must surface.
  */
-async function withAuthRetry<T>(fn: () => Promise<T>): Promise<T> {
-  // Production showed the warm-up takes ~5s: a failure at :44 succeeded at :49.
-  // Two retries totalling 5s of waiting cover it; a third 401 is real.
-  const waits = [1_500, 3_500];
+function isColdAuth(err: unknown): boolean {
+  return (err as { status?: number }).status === 401;
+}
+// Under load the relayer also times out ("This operation was aborted") and
+// drops connections. Those are safe to retry ONLY for reads: a timed-out
+// remember() may have been accepted server-side, and retrying it is exactly
+// how the namespace got a duplicate finding on 2026-08-27.
+function isTransientRead(err: unknown): boolean {
+  const msg = String((err as { message?: string }).message ?? err);
+  return /aborted|abort|fetch failed|ECONNRESET|ETIMEDOUT|socket/i.test(msg);
+}
+
+async function retrying<T>(
+  fn: () => Promise<T>,
+  retriable: (err: unknown) => boolean,
+): Promise<T> {
+  // Warm-up measured at ~5s in production; the extra 8s wait brackets the
+  // slower blips seen under hackathon-evening load. A failure after all three
+  // is real and must surface.
+  const waits = [1_500, 3_500, 8_000];
   for (const wait of waits) {
     try {
       return await fn();
     } catch (err) {
-      if ((err as { status?: number }).status !== 401) throw err;
+      if (!retriable(err)) throw err;
       await new Promise((r) => setTimeout(r, wait));
     }
   }
   return fn();
 }
+
+/** Writes: retry ONLY the cold-client 401 (rejected before acceptance). */
+const withAuthRetry = <T,>(fn: () => Promise<T>) => retrying(fn, isColdAuth);
+/** Reads: also retry timeouts and dropped connections - idempotent. */
+const withReadRetry = <T,>(fn: () => Promise<T>) =>
+  retrying(fn, (e) => isColdAuth(e) || isTransientRead(e));
 
 export interface StoreResult {
   status: "done" | "pending";
@@ -233,7 +255,8 @@ export async function storeFinding(
 /** One-shot status of a remember job; served by GET /api/jobs/[id] so the UI can finish a "pending" store. */
 export async function jobStatus(jobId: string) {
   const c = await client();
-  return c.getRememberStatus(jobId);
+  // Read-only: a transient failure here would make a landed write look failed.
+  return withReadRetry(() => c.getRememberStatus(jobId));
 }
 
 /**
@@ -254,7 +277,7 @@ export async function searchFindings(
   // finding that retracts an old one is worded differently and may rank below
   // the old row for the original-symptom query. Over-fetch, resolve, then trim
   // to what the caller asked for.
-  const res = await withAuthRetry(() =>
+  const res = await withReadRetry(() =>
     c.recall({
       query,
       limit: Math.min(Math.max(want * 3, RECALL_OVERFETCH_MIN), RECALL_OVERFETCH_MAX),
