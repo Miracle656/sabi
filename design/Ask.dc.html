@@ -1,0 +1,164 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Roboto:wght@300;400;500&family=Geist+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #ffffff; text-decoration: none; }
+    a:hover { color: #a1a1a1; }
+    ::selection { background: rgba(255,255,255,0.16); }
+  </style>
+</helmet>
+
+<div style="--ok: {{accent}}; --paper:#000000; --surface2:#0e0e0e; --ink:#ffffff; --muted:#a1a1a1; --faint:#6e6e6e; --line:rgba(255,255,255,0.08); --line2:rgba(255,255,255,0.14); --soft:#1c1c1c; --warn:oklch(0.78 0.13 78); --r:10px; width: 1440px; height: 1000px; position: relative; overflow: hidden; background: var(--paper); color: var(--ink); font-family: 'Roboto', system-ui, sans-serif; font-size: 15px; letter-spacing: -0.01em;">
+
+  <!-- ── top bar ─────────────────────────────────────────────── -->
+  <div style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 18px; height: 66px; padding: 0 40px; border-bottom: 1px solid var(--line);">
+    <div style="display: flex; align-items: center; gap: 12px; justify-self: start;">
+      <svg width="26" height="26" viewBox="0 0 26 26" fill="none" style="flex-shrink: 0;">
+        <rect x="0.5" y="0.5" width="25" height="25" rx="7" stroke="var(--line2)"></rect>
+        <rect x="6" y="7" width="14" height="2" rx="1" fill="var(--ok)"></rect>
+        <rect x="6" y="12" width="10" height="2" rx="1" fill="var(--muted)"></rect>
+        <rect x="6" y="17" width="6" height="2" rx="1" fill="var(--faint)"></rect>
+      </svg>
+      <span style="font-family: 'Archivo', system-ui, sans-serif; font-size: 19px; font-weight: 500; letter-spacing: -0.03em;">Sabi</span>
+      <span style="width: 1px; height: 18px; background: var(--line2);"></span>
+      <span style="font-family: 'Geist Mono', ui-monospace, monospace; font-size: 12.5px; color: var(--muted);">ns:sabi</span>
+      <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ok);">
+        <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--ok);"></span>
+        live
+      </span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 22px; justify-self: center; font-size: 13.5px; color: var(--muted);">
+      <span style="color: var(--ink);">Ask</span>
+      <span>Ledger</span>
+      <span>Members</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px; justify-self: end;">
+      <div style="display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; padding: 7px 12px; border-radius: var(--r); border: 1px solid var(--line2); color: var(--ink);">
+        Claude Opus 5
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><path d="M6 9l6 6 6-6"></path></svg>
+      </div>
+      <div style="display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; padding: 7px 12px; border-radius: var(--r); border: 1px solid var(--line2); color: var(--muted);">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M15 4v16"></path></svg>
+        Ledger
+      </div>
+    </div>
+  </div>
+
+  <!-- ── masthead ────────────────────────────────────────────── -->
+  <div style="max-width: 880px; margin: 0 auto; padding: 78px 24px 0; display: flex; flex-direction: column;">
+
+    <div style="display: flex; align-items: center; gap: 12px; font-size: 12.5px; color: var(--faint); font-variant-numeric: tabular-nums;">
+      <span style="display: inline-flex; align-items: center; gap: 7px; color: var(--muted);">
+        <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--ok);"></span>
+        142 findings
+      </span>
+      <span>&middot;</span>
+      <span>9 members</span>
+      <span>&middot;</span>
+      <span>last verified 2 days ago</span>
+      <span>&middot;</span>
+      <span style="color: var(--warn);">7 need re-checking</span>
+    </div>
+
+    <h1 style="margin: 22px 0 0; font-family: 'Archivo', system-ui, sans-serif; font-size: 52px; font-weight: 400; line-height: 1.08; letter-spacing: -0.035em; max-width: 15ch;">
+      Ask before you burn a day on a landmine somebody don already hit.
+    </h1>
+
+    <p style="margin: 20px 0 0; font-size: 16.5px; line-height: 1.6; color: var(--muted); max-width: 58ch;">
+      Sabi na the community brain for Naija web3 and fintech devs. It checks wetin people don verify before it answers, and it only keeps wetin you confirm say you reproduce yourself.
+    </p>
+
+    <!-- composer -->
+    <div style="margin-top: 38px; display: flex; flex-direction: column; gap: 11px;">
+      <div style="display: flex; align-items: flex-end; gap: 12px; border: 1px solid var(--line2); border-radius: 14px; background: var(--surface2); padding: 16px 14px 13px 18px; box-shadow: 0 1px 2px rgba(0,0,0,0.5), 0 8px 24px rgba(0,0,0,0.5);">
+        <span style="flex-grow: 1; font-size: 15.5px; color: var(--faint); padding-bottom: 8px;">Wetin dey block you?</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); border: 1px solid var(--line2); border-radius: 999px; padding: 5px 11px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+            Store a finding
+          </div>
+          <div style="width: 34px; height: 34px; border-radius: 50%; background: var(--ink); display: grid; place-items: center;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--paper)" stroke-width="2"><path d="M12 19V5"></path><path d="M5 12l7-7 7 7"></path></svg>
+          </div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <span style="font-size: 13px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px;">WalletConnect dey fail on MTN</span>
+        <span style="font-size: 13px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px;">Which offramp actually settles?</span>
+        <span style="font-size: 13px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px;">OPay payout gotchas</span>
+      </div>
+    </div>
+
+    <!-- freshly verified: lead with the memory, not with example prompts -->
+    <div style="margin-top: 54px; display: flex; flex-direction: column;">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; padding-bottom: 13px; border-bottom: 1px solid var(--line);">
+        <span style="font-size: 13px; font-weight: 500; letter-spacing: 0.02em;">Wetin the community verify this week</span>
+        <span style="font-size: 12.5px; color: var(--faint);">Open the ledger</span>
+      </div>
+
+      <sc-for list="{{recent}}" as="row" hint-placeholder-count="3">
+        <div style="display: grid; grid-template-columns: 92px 1fr auto; align-items: baseline; gap: 20px; padding: 15px 0; border-bottom: 1px solid var(--line);">
+          <span style="font-size: 10.5px; font-weight: 500; letter-spacing: 0.1em; color: {{row.tone}};">{{row.cat}}</span>
+          <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0;">
+            <span style="font-size: 14.5px;">{{row.title}}</span>
+            <span style="font-size: 13px; color: var(--faint);">{{row.fix}}</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 14px; font-size: 12px; color: var(--faint); font-variant-numeric: tabular-nums;">
+            <span>{{row.who}}</span>
+            <span style="color: var(--muted);">{{row.when}}</span>
+            <span style="font-family: 'Geist Mono', ui-monospace, monospace;">{{row.id}}</span>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- ── footer note ─────────────────────────────────────────── -->
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 20px 40px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--faint);">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 9h18"></path></svg>
+    Every finding is one encrypted blob on Walrus. The chain says who fit write; the community says wetin true.
+    <span style="flex-grow: 1;"></span>
+    <span style="font-family: 'Geist Mono', ui-monospace, monospace;">relayer.memory.walrus.xyz</span>
+  </div>
+
+</div>
+
+<script data-dc-script data-props='{"accent":{"editor":"color","default":"oklch(0.78 0.13 158)","section":"Theme"}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      accent: this.props.accent ?? "oklch(0.78 0.13 158)",
+      recent: [
+        {
+          cat: "CARRIER", tone: "var(--ok)",
+          title: "MTN blocks the default WalletConnect relay on mobile data",
+          fix: "Point AppKit at your own relay URL; keep deep links as fallback.",
+          who: "@ada +3", when: "14 Aug", id: "7Kq4…3fN"
+        },
+        {
+          cat: "PAYMENTS", tone: "var(--ok)",
+          title: "OPay payout returns 200 with an empty body on a repeated idempotency key",
+          fix: "Re-read the transfer status endpoint; do not treat 200 as settled.",
+          who: "@bayo +1", when: "11 Aug", id: "9Lm2…Qw8"
+        },
+        {
+          cat: "RPC", tone: "var(--warn)",
+          title: "Public Sui fullnode starts 429-ing above ~20 rps from Lagos IPs",
+          fix: "None known — people move to a paid RPC.",
+          who: "@kelechi", when: "02 Jun", id: "4Zx7…Rt5"
+        }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

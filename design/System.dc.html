@@ -1,0 +1,248 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Roboto:wght@300;400;500&family=Geist+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #ffffff; text-decoration: none; }
+    a:hover { color: #a1a1a1; }
+    ::selection { background: rgba(255,255,255,0.16); }
+  </style>
+</helmet>
+
+<div style="--ok: {{accent}}; --paper:#000000; --surface2:#0e0e0e; --ink:#ffffff; --muted:#a1a1a1; --faint:#6e6e6e; --line:rgba(255,255,255,0.08); --line2:rgba(255,255,255,0.14); --soft:#1c1c1c; --warn:oklch(0.78 0.13 78); --bad:oklch(0.70 0.16 25); --r:10px; width: 1120px; height: 1900px; background: var(--paper); color: var(--ink); font-family: 'Roboto', system-ui, sans-serif; font-size: 15px; letter-spacing: -0.01em; padding: 48px 56px 56px; display: flex; flex-direction: column; gap: 44px;">
+
+  <!-- header -->
+  <div style="display: flex; flex-direction: column; gap: 10px;">
+    <span style="font-size: 10.5px; font-weight: 500; letter-spacing: 0.14em; color: var(--faint);">SABI DESIGN SYSTEM</span>
+    <h1 style="margin: 0; font-family: 'Archivo', system-ui, sans-serif; font-size: 38px; font-weight: 400; letter-spacing: -0.03em; line-height: 1.1;">
+      One accent, and it only ever means verified.
+    </h1>
+    <p style="margin: 0; max-width: 68ch; font-size: 15px; line-height: 1.65; color: var(--muted);">
+      Built on Cortex&rsquo;s tokens &mdash; pure-black canvas, 8&#37;-white hairlines, 10px radius, Roboto body, 880px column. Sabi adds exactly one thing Cortex does not have: colour that carries verification state. Nothing else in the interface is allowed to be coloured.
+    </p>
+  </div>
+
+  <!-- ── colour semantics ────────────────────────────────────── -->
+  <div style="display: flex; flex-direction: column; gap: 16px;">
+    <span style="font-size: 12.5px; font-weight: 500; letter-spacing: 0.02em; padding-bottom: 12px; border-bottom: 1px solid var(--line);">Colour is data, not decoration</span>
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px;">
+      <div style="display: flex; flex-direction: column; gap: 9px;">
+        <span style="height: 44px; border-radius: 8px; background: var(--ok);"></span>
+        <span style="font-size: 13px;">Verified &amp; fresh</span>
+        <span style="font-size: 12px; color: var(--faint); line-height: 1.5;">Confirmed by a member, inside its freshness window.</span>
+        <span style="font-family: 'Geist Mono', ui-monospace, monospace; font-size: 11px; color: var(--muted);">oklch(.78 .13 158)</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 9px;">
+        <span style="height: 44px; border-radius: 8px; background: var(--warn);"></span>
+        <span style="font-size: 13px;">Stale</span>
+        <span style="font-size: 12px; color: var(--faint); line-height: 1.5;">Volatile category, verified over 60 days ago. Must look degraded.</span>
+        <span style="font-family: 'Geist Mono', ui-monospace, monospace; font-size: 11px; color: var(--muted);">oklch(.78 .13 78)</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 9px;">
+        <span style="height: 44px; border-radius: 8px; background: var(--bad);"></span>
+        <span style="font-size: 13px;">Refused &amp; disputed</span>
+        <span style="font-size: 12px; color: var(--faint); line-height: 1.5;">A write Sabi rejected, or a finding another member contradicts.</span>
+        <span style="font-family: 'Geist Mono', ui-monospace, monospace; font-size: 11px; color: var(--muted);">oklch(.70 .16 25)</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 9px;">
+        <span style="height: 44px; border-radius: 8px; border: 1px dashed var(--line2);"></span>
+        <span style="font-size: 13px;">Unsourced</span>
+        <span style="font-size: 12px; color: var(--faint); line-height: 1.5;">Model inference nobody verified. Dashed, never coloured, never hidden.</span>
+        <span style="font-family: 'Geist Mono', ui-monospace, monospace; font-size: 11px; color: var(--muted);">dashed hairline</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── record states ───────────────────────────────────────── -->
+  <div style="display: flex; flex-direction: column; gap: 16px;">
+    <span style="font-size: 12.5px; font-weight: 500; letter-spacing: 0.02em; padding-bottom: 12px; border-bottom: 1px solid var(--line);">The record, in every state it can reach</span>
+
+    <sc-for list="{{records}}" as="rec" hint-placeholder-count="5">
+      <div style="display: grid; grid-template-columns: 132px 1fr; gap: 22px; align-items: start;">
+        <div style="display: flex; flex-direction: column; gap: 5px; padding-top: 13px;">
+          <span style="font-size: 12.5px;">{{rec.label}}</span>
+          <span style="font-size: 11.5px; color: var(--faint); line-height: 1.45;">{{rec.when}}</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 3px 1fr; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; background: {{rec.bg}}; opacity: {{rec.dim}};">
+          <div style="background: {{rec.tone}};"></div>
+          <div style="padding: 13px 16px 12px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <span style="font-size: 10.5px; font-weight: 500; letter-spacing: 0.1em; color: {{rec.tone}};">{{rec.cat}}</span>
+              <span style="font-family: 'Archivo', system-ui, sans-serif; font-size: 15px; font-weight: 500; letter-spacing: -0.02em; text-decoration: {{rec.strike}};">{{rec.title}}</span>
+              <sc-if value="{{rec.pill}}" hint-placeholder-val="{{true}}">
+                <span style="font-size: 11px; color: {{rec.tone}}; border: 1px solid {{rec.tone}}; border-radius: 999px; padding: 2px 8px;">{{rec.pill}}</span>
+              </sc-if>
+            </div>
+            <p style="margin: 0; font-size: 14px; line-height: 1.6; color: var(--muted);">{{rec.body}}</p>
+            <div style="display: flex; align-items: center; gap: 13px; flex-wrap: wrap; padding-top: 9px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--faint); font-variant-numeric: tabular-nums;">
+              <span style="color: var(--muted);">{{rec.meterLabel}}</span>
+              <div style="display: flex; gap: 2px; width: 68px; height: 3px; border-radius: 2px; overflow: hidden;">
+                <span style="flex-grow: {{rec.a}}; background: {{rec.tone}};"></span>
+                <span style="flex-grow: {{rec.b}}; background: {{rec.disputeTone}};"></span>
+                <span style="flex-grow: {{rec.c}}; background: rgba(255,255,255,0.12);"></span>
+              </div>
+              <span>{{rec.who}}</span>
+              <span style="flex-grow: 1;"></span>
+              <span style="font-family: 'Geist Mono', ui-monospace, monospace; color: var(--muted);">{{rec.id}}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+
+  <!-- ── activity + write states ─────────────────────────────── -->
+  <div style="display: flex; flex-direction: column; gap: 16px;">
+    <span style="font-size: 12.5px; font-weight: 500; letter-spacing: 0.02em; padding-bottom: 12px; border-bottom: 1px solid var(--line);">Activity rows &mdash; running state, then a past-tense state with a count</span>
+
+    <div style="display: flex; flex-direction: column; gap: 11px;">
+      <div style="display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--muted);">
+        <span style="width: 13px; height: 13px; border-radius: 50%; border: 1.5px solid var(--line2); border-top-color: var(--ok); flex-shrink: 0;"></span>
+        Sabi dey check community memory&hellip;
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--muted);">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="1.6"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+        Recalled <span style="color: var(--ink);">&ldquo;OPay payout&rdquo;</span> <span style="color: var(--faint);">&middot;</span> 3 active <span style="color: var(--faint);">&middot;</span> 1 superseded
+        <span style="font-family: 'Geist Mono', ui-monospace, monospace; color: var(--faint);">0.8s</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--muted);">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" stroke-width="1.6"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+        Community memory no get anything on this yet &mdash; answering from general knowledge, unverified.
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--bad);">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5"></path><path d="M12 16h.01"></path></svg>
+        Relayer no respond &mdash; I never reach Walrus, so nothing here is verified.
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 8px;">
+      <!-- pending -->
+      <div style="border: 1px solid var(--line); border-radius: var(--r); padding: 13px 15px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 9px; font-size: 11px; font-weight: 500; letter-spacing: 0.06em; color: var(--warn);">
+          <span style="width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.14); border-top-color: var(--warn);"></span>
+          RELAYER STILL UPLOADING
+        </div>
+        <span style="font-size: 13.5px;">[PAYMENTS] OPay payout on a repeated idempotency key</span>
+        <span style="font-size: 12px; color: var(--faint);">Job accepted. This card fills in the blob id by itself when e land.</span>
+      </div>
+      <!-- refused -->
+      <div style="border: 1px solid var(--line); border-radius: var(--r); padding: 13px 15px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 9px; font-size: 11px; font-weight: 500; letter-spacing: 0.06em; color: var(--bad);">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18"></path><path d="M6 6l12 12"></path></svg>
+          I NO GO STORE AM
+        </div>
+        <span style="font-size: 13.5px;">That one carry wetin look like an API key.</span>
+        <span style="font-size: 12px; color: var(--faint);">Memory na append-only &mdash; once e land Walrus, e no dey come back. Strip am and send again.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── refusals ────────────────────────────────────────────── -->
+  <div style="display: flex; flex-direction: column; gap: 16px;">
+    <span style="font-size: 12.5px; font-weight: 500; letter-spacing: 0.02em; padding-bottom: 12px; border-bottom: 1px solid var(--line);">What this system refuses</span>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 40px;">
+      <sc-for list="{{refusals}}" as="item" hint-placeholder-count="8">
+        <div style="display: flex; align-items: baseline; gap: 11px; font-size: 14px; line-height: 1.55; color: var(--muted);">
+          <span style="color: var(--faint); flex-shrink: 0;">&mdash;</span>
+          <span>{{item}}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- ── type ────────────────────────────────────────────────── -->
+  <div style="display: flex; flex-direction: column; gap: 16px;">
+    <span style="font-size: 12.5px; font-weight: 500; letter-spacing: 0.02em; padding-bottom: 12px; border-bottom: 1px solid var(--line);">Type</span>
+    <div style="display: flex; flex-direction: column; gap: 14px;">
+      <div style="display: grid; grid-template-columns: 200px 1fr; gap: 22px; align-items: baseline;">
+        <span style="font-size: 11.5px; color: var(--faint); font-family: 'Geist Mono', ui-monospace, monospace;">Archivo 52 / 400 / -.035em</span>
+        <span style="font-family: 'Archivo', system-ui, sans-serif; font-size: 34px; font-weight: 400; letter-spacing: -0.035em;">Display &mdash; size carries it, never weight</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 200px 1fr; gap: 22px; align-items: baseline;">
+        <span style="font-size: 11.5px; color: var(--faint); font-family: 'Geist Mono', ui-monospace, monospace;">Archivo 16 / 500 / -.02em</span>
+        <span style="font-family: 'Archivo', system-ui, sans-serif; font-size: 16px; font-weight: 500; letter-spacing: -0.02em;">Record subject &mdash; the one line you scan for</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 200px 1fr; gap: 22px; align-items: baseline;">
+        <span style="font-size: 11.5px; color: var(--faint); font-family: 'Geist Mono', ui-monospace, monospace;">Roboto 15.5 / 400 / 1.75</span>
+        <span style="font-size: 15.5px; line-height: 1.75;">Answer prose, straight from Cortex &mdash; no bubble, just text on the page.</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 200px 1fr; gap: 22px; align-items: baseline;">
+        <span style="font-size: 11.5px; color: var(--faint); font-family: 'Geist Mono', ui-monospace, monospace;">Roboto 12 / 400 / tabular</span>
+        <span style="font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums;">Metadata: 4 confirmed &middot; across 3 teams &middot; verified 14 Aug 2026</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 200px 1fr; gap: 22px; align-items: baseline;">
+        <span style="font-size: 11.5px; color: var(--faint); font-family: 'Geist Mono', ui-monospace, monospace;">Geist Mono 12</span>
+        <span style="font-family: 'Geist Mono', ui-monospace, monospace; font-size: 12px; color: var(--muted);">7Kq4…3fN &mdash; ids, hashes and clocks only, never prose</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script data-dc-script data-props='{"accent":{"editor":"color","default":"oklch(0.78 0.13 158)","section":"Theme"}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const ok = "var(--ok)", warn = "var(--warn)", bad = "var(--bad)", faint = "var(--faint)";
+    return {
+      accent: this.props.accent ?? "oklch(0.78 0.13 158)",
+      records: [
+        {
+          label: "Verified", when: "confirmed, inside its window",
+          cat: "CARRIER", tone: ok, disputeTone: bad, bg: "var(--surface2)", dim: "1", strike: "none", pill: "",
+          title: "MTN blocks the default WalletConnect relay",
+          body: "Socket opens, then closes 1006 on mobile data. Same build connects on Wi-Fi and on Glo.",
+          meterLabel: "4 confirmed", a: 4, b: 0, c: 1, who: "@ada +3, 3 teams", id: "7Kq4…3fN"
+        },
+        {
+          label: "Stale", when: "volatile, over 60 days old",
+          cat: "CARRIER", tone: warn, disputeTone: bad, bg: "var(--surface2)", dim: "1", strike: "none", pill: "Stale · 113 days",
+          title: "Airtel NG blocks relay on 4G",
+          body: "Carrier behaviour changes fast — make person re-confirm am before you plan around it.",
+          meterLabel: "1 confirmed", a: 1, b: 0, c: 4, who: "@tunde only, 1 team", id: "2Bd9…Xm1"
+        },
+        {
+          label: "Disputed", when: "members contradict each other",
+          cat: "EXCHANGE", tone: bad, disputeTone: bad, bg: "var(--surface2)", dim: "1", strike: "none", pill: "2 dispute am",
+          title: "Quidax NGN offramp settles same-day",
+          body: "@sade and @ife both saw next-day settlement on amounts above ₦2m. Nobody has re-run the small-amount case.",
+          meterLabel: "2 confirmed", a: 2, b: 2, c: 1, who: "split, 2 teams", id: "6Nn1…Vb4"
+        },
+        {
+          label: "Superseded", when: "a newer finding replaced it",
+          cat: "PAYMENTS", tone: "var(--line2)", disputeTone: faint, bg: "transparent", dim: "0.5", strike: "line-through", pill: "",
+          title: "OPay idempotency is safe to retry",
+          body: "Replaced 23 Aug by Fp8w…Lz2. Still on Walrus, just no longer answers questions.",
+          meterLabel: "1 confirmed", a: 1, b: 0, c: 4, who: "@bayo", id: "9Lm2…Qw8"
+        },
+        {
+          label: "Free text", when: "not in the canonical grammar",
+          cat: "UNPARSED", tone: "var(--line2)", disputeTone: faint, bg: "transparent", dim: "0.8", strike: "none", pill: "",
+          title: "Hand-seeded memory",
+          body: "Shown raw, with its blob id. Sabi will not claim a verification date it does not have.",
+          meterLabel: "no metadata", a: 0, b: 0, c: 5, who: "unknown writer", id: "3Ty8…Kp0"
+        }
+      ],
+      refusals: [
+        "Any colour that is not carrying verification state.",
+        "A second accent. The green has one job.",
+        "Display weight above 600, or bold used to repeat what size already said.",
+        "A confidence figure without the inputs that produced it.",
+        "Sourced and unsourced claims styled the same way.",
+        "A bibliography at the end instead of a chip on the clause.",
+        "Cards nested inside cards — depth comes from opacity lifts.",
+        "A spinner while Sabi is actually waiting on you."
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

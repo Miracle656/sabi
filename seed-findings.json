@@ -1,0 +1,32 @@
+{
+  "_comment": "REPLACE WITH YOUR REAL VERIFIED FINDINGS BEFORE DEMO. Every entry is validated against lib/findings.ts FindingInputSchema. verified_on defaults to today; volatile defaults by category (CARRIER/PAYMENTS/RPC/EXCHANGE = yes). Attribution (by:@handle) comes from SABI_REPORTER. pnpm seed REFUSES to store rows that still contain PLACEHOLDER (append-only memory cannot be cleaned up). Run `pnpm seed --dry` to preview the canonical lines.",
+  "findings": [
+    {
+      "category": "CARRIER",
+      "subject": "PLACEHOLDER — WalletConnect v2 relay on MTN NG mobile data",
+      "finding": "PLACEHOLDER — replace: describe the exact behaviour you reproduced (e.g. wss://relay.walletconnect.com handshake never completes on MTN 4G; works on Wi-Fi and on Glo). Include the error string you saw.",
+      "fix": "PLACEHOLDER — replace: the fix you confirmed (e.g. point the SDK at a custom relay URL, or fall back to deep links).",
+      "network_or_provider": "MTN NG",
+      "version_or_app": "walletconnect v2 / reown appkit x.y",
+      "verified_on": "2026-08-01"
+    },
+    {
+      "category": "PAYMENTS",
+      "subject": "PLACEHOLDER — OPay API behaviour on payouts",
+      "finding": "PLACEHOLDER — replace: the quirk you reproduced (e.g. which endpoint, which status code, what the docs say vs what actually happens).",
+      "fix": "PLACEHOLDER — replace: the workaround that worked for you, or 'none known'.",
+      "network_or_provider": "OPay API",
+      "version_or_app": "OPay merchant API v3",
+      "verified_on": "2026-08-10"
+    },
+    {
+      "category": "RPC",
+      "subject": "PLACEHOLDER — Sui public fullnode rate limiting from Lagos",
+      "finding": "PLACEHOLDER — replace: e.g. which RPC host returned 429s, at what request rate, from which ISP.",
+      "fix": "PLACEHOLDER — replace: e.g. which RPC provider / plan held up.",
+      "network_or_provider": "Sui mainnet",
+      "version_or_app": "fullnode.mainnet.sui.io",
+      "verified_on": "2026-08-15"
+    }
+  ]
+}

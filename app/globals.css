@@ -1,0 +1,332 @@
+@import "tailwindcss";
+/* The published design canvas is a 2 MB artefact, not a source of classes. */
+@source not "../design";
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Tokens lifted verbatim from Cortex (frontend/src/app/cortex.css) so Sabi
+   reads as part of the same family: pure paper, hairline rules, 10px radius,
+   Roboto body. Sabi adds exactly one thing Cortex does not have — colour that
+   carries VERIFICATION STATE. Nothing else in the interface may be coloured.
+
+   Three theme states, in this order:
+     :root                                    → light (the base palette)
+     @media (prefers-color-scheme: dark)      → dark, unless the user chose light
+     :root[data-theme="dark"]                 → dark, whatever the OS says
+   Every colour has its definition on bare :root, so nothing depends on a media
+   query alone.
+   ───────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --paper: #ffffff;
+  --surface: #ffffff;
+  --surface2: #f4f4f5;
+  --ink: #000000;
+  --muted: #595959;
+  --faint: #6f6f6f;
+  --line: #ebebeb;
+  --line2: #dcdcdc;
+  /* Interactive control boundaries need 3:1 (WCAG 1.4.11); --line/--line2 stay
+     Cortex's decorative hairlines. */
+  --edge: #8f8f8f;
+  --soft: #f4f4f5;
+  /* Light composers sit on paper with a shadow; dark ones sit on a lifted
+     surface, per Cortex. */
+  --composer-fill: #ffffff;
+
+  /* the only colours in the system, and they all mean verification state */
+  --ok: #007345;
+  --warn: #8c5b07;
+  --bad: #b82f30;
+  --ok-soft: color-mix(in srgb, #007345 9%, transparent);
+  --warn-soft: color-mix(in srgb, #8c5b07 9%, transparent);
+  --bad-soft: color-mix(in srgb, #b82f30 8%, transparent);
+  --track: rgba(0, 0, 0, 0.1);
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.08), 0 20px 50px rgba(0, 0, 0, 0.1);
+
+  --r: 10px;
+  --composer-max: 880px;
+  --topbar-h: 66px;
+  --rail-w: 372px;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #000000;
+    --surface: #000000;
+    --surface2: #0e0e0e;
+    --ink: #ffffff;
+    --muted: #a1a1a1;
+    --faint: #8c8c8c;
+    --line: rgba(255, 255, 255, 0.08);
+    --line2: rgba(255, 255, 255, 0.14);
+    --edge: #606060;
+    --soft: #1c1c1c;
+    --composer-fill: #0e0e0e;
+
+    --ok: oklch(0.78 0.13 158);
+    --warn: oklch(0.78 0.13 78);
+    --bad: oklch(0.7 0.16 25);
+    --ok-soft: oklch(0.78 0.13 158 / 0.12);
+    --warn-soft: oklch(0.78 0.13 78 / 0.12);
+    --bad-soft: oklch(0.7 0.16 25 / 0.12);
+    --track: rgba(255, 255, 255, 0.12);
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.6), 0 20px 50px rgba(0, 0, 0, 0.7);
+
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #000000;
+  --surface: #000000;
+  --surface2: #0e0e0e;
+  --ink: #ffffff;
+  --muted: #a1a1a1;
+  --faint: #8c8c8c;
+  --line: rgba(255, 255, 255, 0.08);
+  --line2: rgba(255, 255, 255, 0.14);
+  --edge: #606060;
+  --soft: #1c1c1c;
+  --composer-fill: #0e0e0e;
+
+  --ok: oklch(0.78 0.13 158);
+  --warn: oklch(0.78 0.13 78);
+  --bad: oklch(0.7 0.16 25);
+  --ok-soft: oklch(0.78 0.13 158 / 0.12);
+  --warn-soft: oklch(0.78 0.13 78 / 0.12);
+  --bad-soft: oklch(0.7 0.16 25 / 0.12);
+  --track: rgba(255, 255, 255, 0.12);
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.6), 0 20px 50px rgba(0, 0, 0, 0.7);
+
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface2: var(--surface2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-line: var(--line);
+  --color-line2: var(--line2);
+  --color-edge: var(--edge);
+  --color-soft: var(--soft);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad-soft: var(--bad-soft);
+  --color-track: var(--track);
+
+  --font-sans: var(--font-roboto), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-archivo), var(--font-roboto), ui-sans-serif, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius-card: var(--r);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  font-feature-settings: "rlig" 1, "calt" 1, "kern" 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Theme changes should feel like a state change, not an animation: one
+   property, short, and off entirely for anyone who asked for less motion. */
+@media (prefers-reduced-motion: no-preference) {
+  body {
+    transition: background-color 140ms ease, color 140ms ease;
+  }
+}
+
+/* Tracking tightens as size grows: -0.02em at record-subject size, -0.03em at
+   masthead size. Two classes rather than one averaged value. */
+.display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+h1.display,
+.display-lg {
+  letter-spacing: -0.035em;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The uppercase micro-label used for categories and section eyebrows. */
+.eyebrow {
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* Focus that survives keyboard navigation in both themes. */
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: color-mix(in oklch, var(--ink) 16%, transparent);
+}
+
+/* Scrollbars that do not fight a black canvas. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line2) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--line2);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes sabi-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.spin {
+  animation: sabi-spin 0.9s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}
+
+@keyframes sabi-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.enter {
+  animation: sabi-in 180ms cubic-bezier(0.2, 0.6, 0.2, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .enter {
+    animation: none;
+  }
+}
+
+/* ── answer prose ─────────────────────────────────────────────────────────
+   Cortex's assistant treatment: no bubble, 15.5px/1.75 straight on the page. */
+.prose-sabi {
+  font-size: 15.5px;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+  /* Answers are prose: cap the measure even though the column is 880px. */
+  max-width: 72ch;
+}
+.prose-sabi p + p {
+  margin-top: 0.7rem;
+}
+.prose-sabi code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 0.08em 0.34em;
+}
+.prose-sabi pre {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.65;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 12px 14px;
+  overflow-x: auto;
+  margin: 0.7rem 0;
+}
+.prose-sabi pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+.prose-sabi ul,
+.prose-sabi ol {
+  padding-left: 1.15rem;
+  margin: 0.5rem 0;
+}
+.prose-sabi ul {
+  list-style: disc;
+}
+.prose-sabi ol {
+  list-style: decimal;
+}
+.prose-sabi li + li {
+  margin-top: 0.25rem;
+}
+.prose-sabi li::marker {
+  color: var(--faint);
+}
+.prose-sabi strong {
+  font-weight: 500;
+}
+.prose-sabi a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--line2);
+  text-underline-offset: 2px;
+}
+.prose-sabi a:hover {
+  text-decoration-color: var(--ink);
+}
+.prose-sabi table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin: 0.7rem 0;
+}
+.prose-sabi th,
+.prose-sabi td {
+  border: 1px solid var(--line);
+  padding: 7px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.prose-sabi th {
+  font-weight: 500;
+  background: var(--surface2);
+}

@@ -1,0 +1,57 @@
+{
+  "pages": [
+    { "id": "screens", "name": "The redesign" },
+    { "id": "system", "name": "System" }
+  ],
+  "artboards": [
+    { "file": "Ask.dc.html", "page": "screens", "title": "First run", "x": 0, "y": 0, "w": 1440, "h": 1000 },
+    { "file": "Main.dc.html", "page": "screens", "title": "Recall", "x": 1560, "y": 0, "w": 1440, "h": 1000 },
+    { "file": "Store.dc.html", "page": "screens", "title": "Store a finding", "x": 3120, "y": 0, "w": 1440, "h": 1000 },
+    { "file": "Light.dc.html", "page": "screens", "title": "Light — a disputed finding", "x": 0, "y": 1180, "w": 1440, "h": 1000 },
+    { "file": "Mobile.dc.html", "page": "screens", "title": "Phone", "x": 1560, "y": 1180, "w": 430, "h": 932 },
+    { "file": "System.dc.html", "page": "system", "title": "Design system", "x": 0, "y": 0, "w": 1120, "h": 1900 }
+  ],
+  "annotations": [
+    {
+      "id": "note-first-run",
+      "page": "screens",
+      "x": 0,
+      "y": -190,
+      "w": 420,
+      "text": "First run leads with the memory, not with example prompts.\n\nThe old empty state offered three things to type. This one opens with what the community has actually verified this week — because that stock of findings IS the product, and a stranger should be able to judge it in three seconds."
+    },
+    {
+      "id": "note-recall",
+      "page": "screens",
+      "x": 1560,
+      "y": -190,
+      "w": 420,
+      "text": "Two moves borrowed from the best provenance UIs:\n\n1. Citations sit on the clause they cover (@ada +3), not in a list at the end — and the clause nobody verified wears a dashed \"my own guess\" chip instead of borrowing the credibility of the sourced ones.\n\n2. Verification is a distribution, not a badge. The meter shows confirmed vs disputed and how many teams, so a clique of one cannot look like consensus."
+    },
+    {
+      "id": "note-store",
+      "page": "screens",
+      "x": 3120,
+      "y": -190,
+      "w": 420,
+      "text": "The write confirmation IS the record it created — same component, provenance already visible — rather than a \"Saved ✓\" toast.\n\nBecause Walrus is append-only, supersession is shown honestly: the replaced finding stays on screen, struck through, with its author and id intact. Nothing is deleted; it just stops answering."
+    },
+    {
+      "id": "note-built-vs-drawn",
+      "page": "screens",
+      "x": 4680,
+      "y": -190,
+      "w": 420,
+      "text": "BUILT vs DRAWN — one deliberate gap.\n\nThe confirmed/disputed meter drawn here needs data the canonical line does not carry: it records exactly ONE verifier per finding, so there is no distribution to draw. Inventing one would be the exact dishonesty this design is against.\n\nThe shipped app therefore shows a FRESHNESS meter instead — how much of the 60-day window a volatile finding has left, which is real and derived from its verified date. The consensus meter becomes truthful the moment findings can carry a confirmations list; that is a data-model change, not a design one.\n\nEverything else on these boards is live at localhost."
+    },
+    {
+      "id": "note-light",
+      "page": "screens",
+      "x": 0,
+      "y": 2260,
+      "w": 420,
+      "text": "Same tokens inverted to Cortex's light set (#fff paper, #ebebeb hairlines). The screen shown is the hardest case: a finding the community actively disagrees about. Sabi says so instead of averaging it into a confidence score."
+    }
+  ],
+  "launch": { "view": "canvas", "page": "screens" }
+}
