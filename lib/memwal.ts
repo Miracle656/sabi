@@ -179,6 +179,23 @@ export async function network(): Promise<Network> {
   }
 }
 
+/**
+ * The relayer 401s the FIRST signed request it sees from a cold client while it
+ * loads the account from chain into its cache (observed on both mainnet and
+ * staging, 2026-08-27), then accepts the retry. On serverless every cold start
+ * replays that. One retry, only on 401 - a second 401 is a real credential
+ * problem and must surface.
+ */
+async function withAuthRetry<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    if ((err as { status?: number }).status !== 401) throw err;
+    await new Promise((r) => setTimeout(r, 1_500));
+    return fn();
+  }
+}
+
 export interface StoreResult {
   status: "done" | "pending";
   memory_id?: string; // Walrus blob id - the stable id recall returns
@@ -193,7 +210,7 @@ export async function storeFinding(
 ): Promise<StoreResult> {
   const c = await client();
   const ns = opts.namespace ?? defaultNamespace();
-  const accepted = await c.remember(text, ns);
+  const accepted = await withAuthRetry(() => c.remember(text, ns));
   try {
     const done = await c.waitForRememberJob(accepted.job_id, {
       timeoutMs: opts.timeoutMs ?? REMEMBER_TIMEOUT_MS,
@@ -232,12 +249,14 @@ export async function searchFindings(
   // finding that retracts an old one is worded differently and may rank below
   // the old row for the original-symptom query. Over-fetch, resolve, then trim
   // to what the caller asked for.
-  const res = await c.recall({
-    query,
-    limit: Math.min(Math.max(want * 3, RECALL_OVERFETCH_MIN), RECALL_OVERFETCH_MAX),
-    namespace: ns,
-    maxDistance: getEnv().mode === "mock" ? MOCK_MAX_DISTANCE : MAX_DISTANCE,
-  });
+  const res = await withAuthRetry(() =>
+    c.recall({
+      query,
+      limit: Math.min(Math.max(want * 3, RECALL_OVERFETCH_MIN), RECALL_OVERFETCH_MAX),
+      namespace: ns,
+      maxDistance: getEnv().mode === "mock" ? MOCK_MAX_DISTANCE : MAX_DISTANCE,
+    }),
+  );
   const today = opts.today ?? todayISO();
   const hits = res.results.map((r) => enrich(r.blob_id, r.text, r.distance, today));
   const { active, superseded } = resolveSupersession(hits);
