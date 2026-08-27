@@ -53,9 +53,18 @@ Claude Desktop config (`claude_desktop_config.json`):
 }
 ```
 
+For clients that cannot spawn a local process — **claude.ai** and **ChatGPT
+web** — the deployment serves the same tools as a remote MCP server at
+`https://<your-deployment>/api/mcp` (stateless streamable HTTP; both the stdio
+server and this endpoint register from `mcp/tools.ts`, so they are provably the
+same surface). claude.ai: Settings → Connectors → Add custom connector → paste
+the URL. ChatGPT: enable Developer Mode under Settings → Apps & Connectors,
+then add the URL as a connector.
+
 Load the `sabi` prompt first — the tools without the memory rules will happily
 store hearsay; the prompt is the gatekeeper. Attribution over MCP is the
-server's `SABI_REPORTER`, exactly like the web app.
+server's `SABI_REPORTER`, exactly like the web app (the remote endpoint has no
+sign-in session).
 
 ## Sign in (optional)
 
