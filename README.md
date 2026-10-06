@@ -26,7 +26,8 @@ product; the agent is just the interface.**
   names the old memory id in `SUPERSEDES:`; recall resolves the chain and hides
   the old one. Nothing is ever lost, it just stops being the answer.
 - **Different model. Same memory.** The header switcher swaps Claude Opus 5 /
-  Claude Sonnet 5 / (optionally) an OpenAI model. The tools, namespace and
+  Claude Sonnet 5 / (optionally) OpenAI models / (optionally) open-weight models
+  on Groq (`GROQ_API_KEY`, e.g. Qwen). The tools, namespace and
   delegate key do not change, so the memory one model wrote, another recalls.
 - **Ledger rail.** A right-rail log of every recall and store in the session,
   with memory ids linking to Walruscan and the Walrus aggregator — the
@@ -96,8 +97,8 @@ pnpm dev                    # http://localhost:3000
 No Walrus Memory credentials yet? `MEMWAL_MODE=mock` runs the full UI against an
 in-memory store seeded from `seed-findings.json` — so recall returns real cards
 and the first-run screen has rows, while nothing persists and nothing touches
-Walrus. (A model provider key is still required — `ANTHROPIC_API_KEY` or
-`OPENAI_API_KEY`, either one: the model is real, only the memory is mocked.)
+Walrus. (A model provider key is still required — `ANTHROPIC_API_KEY`,
+`OPENAI_API_KEY` or `GROQ_API_KEY`, any one: the model is real, only the memory is mocked.)
 
 Get real credentials at the Walrus Memory Playground: <https://memory.walrus.xyz>.
 Note the public relayer is **mainnet**; accounts minted in the playground are

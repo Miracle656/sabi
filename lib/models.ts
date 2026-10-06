@@ -1,7 +1,7 @@
 // The model switcher registry. "Different model. Same memory." - every entry
 // reads and writes the same Walrus Memory namespace through the same two tools.
 
-export type Provider = "anthropic" | "openai";
+export type Provider = "anthropic" | "openai" | "groq";
 
 export interface ModelOption {
   id: string;
@@ -17,11 +17,12 @@ export const CLAUDE_MODELS: ModelOption[] = [
 export const DEFAULT_MODEL_ID = CLAUDE_MODELS[0].id;
 
 /**
- * OPENAI_MODEL is a comma-separated list so the switcher still has something to
- * switch BETWEEN when OpenAI is the only configured provider - "different model,
- * same memory" is the whole demo, and it needs at least two entries.
+ * OPENAI_MODEL / GROQ_MODEL are comma-separated lists so the switcher still has
+ * something to switch BETWEEN when one provider is the only one configured -
+ * "different model, same memory" is the whole demo, and it needs at least two
+ * entries.
  */
-export function openaiModelIds(spec: string): string[] {
+export function modelIds(spec: string): string[] {
   const seen = new Set<string>();
   for (const raw of spec.split(",")) {
     const id = raw.trim();
@@ -31,10 +32,19 @@ export function openaiModelIds(spec: string): string[] {
 }
 
 export function openaiOptions(spec: string): ModelOption[] {
-  return openaiModelIds(spec).map((id) => ({
+  return modelIds(spec).map((id) => ({
     id,
     label: prettyOpenAI(id),
     provider: "openai" as const,
+  }));
+}
+
+/** Groq ids are `vendor/model` or bare; the label keeps the model and says where it runs. */
+export function groqOptions(spec: string): ModelOption[] {
+  return modelIds(spec).map((id) => ({
+    id,
+    label: `${id.slice(id.lastIndexOf("/") + 1)} · Groq`,
+    provider: "groq" as const,
   }));
 }
 
@@ -54,9 +64,12 @@ export function availableModels(keys: {
   anthropic: boolean;
   openai: boolean;
   openaiModels: string;
+  groq: boolean;
+  groqModels: string;
 }): ModelOption[] {
   const out: ModelOption[] = [];
   if (keys.anthropic) out.push(...CLAUDE_MODELS);
   if (keys.openai) out.push(...openaiOptions(keys.openaiModels));
+  if (keys.groq) out.push(...groqOptions(keys.groqModels));
   return out;
 }

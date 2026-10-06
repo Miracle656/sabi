@@ -21,6 +21,8 @@ export default async function Page() {
     anthropic: Boolean(env.anthropicKey),
     openai: Boolean(env.openaiKey),
     openaiModels: env.openaiModels,
+    groq: Boolean(env.groqKey),
+    groqModels: env.groqModels,
   });
   if (models.length === 0) {
     // Keys are present but the model list parsed to nothing (e.g. OPENAI_MODEL=",").
@@ -28,7 +30,7 @@ export default async function Page() {
       <SetupScreen
         missing={[
           {
-            name: "OPENAI_MODEL",
+            name: "OPENAI_MODEL / GROQ_MODEL",
             why: "the configured model list parsed to zero runnable models",
             where: 'comma-separated ids, e.g. "gpt-5.5,gpt-5.4-mini"',
           },

@@ -45,9 +45,9 @@ test("format → parse round-trips every field", () => {
 });
 
 test("supersedes pointer survives the round trip", () => {
-  const f: Finding = { ...base, supersedes: "abc123" };
+  const f: Finding = { ...base, supersedes: "blob_abc123" };
   const parsed = parseFinding(formatFinding(f));
-  assert.equal(parsed?.supersedes, "abc123");
+  assert.equal(parsed?.supersedes, "blob_abc123");
   assert.equal(parsed?.reportedBy, "@ada");
 });
 
@@ -181,4 +181,22 @@ test("secretInFinding catches secrets in every user-writable field", async () =>
     }),
     null,
   );
+});
+
+test("a null-ish supersedes is no pointer; a non-id is refused", () => {
+  for (const v of [null, "", "null", "NULL", "none", "undefined", " n/a "]) {
+    const r = FindingInputSchema.safeParse({ ...minimal, supersedes_memory_id: v });
+    assert.equal(r.success, true, String(v));
+    assert.equal(r.success && r.data.supersedes_memory_id, undefined);
+  }
+  // A list position is not a memory id.
+  assert.equal(FindingInputSchema.safeParse({ ...minimal, supersedes_memory_id: "2" }).success, false);
+});
+
+test("rows already stored with SUPERSEDES:null parse as not superseding anything", () => {
+  for (const junk of ["null", "NULL", "2"]) {
+    const parsed = parseFinding(`${formatFinding(base)} | SUPERSEDES:${junk}`);
+    assert.equal(parsed?.subject, base.subject);
+    assert.equal(parsed?.supersedes, undefined);
+  }
 });

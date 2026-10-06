@@ -15,6 +15,9 @@ export interface SabiEnv {
   openaiKey: string;
   /** Comma-separated OpenAI model ids offered in the switcher. */
   openaiModels: string;
+  groqKey: string;
+  /** Comma-separated Groq model ids (open-weight models) offered in the switcher. */
+  groqModels: string;
   /** Google OAuth client id - presence enables Enoki sign-in. */
   googleClientId: string;
   /** Enoki public API key - lets sign-in also resolve a zkLogin Sui address. */
@@ -26,6 +29,7 @@ export interface SabiEnv {
 const DEFAULT_RELAYER = "https://relayer.memory.walrus.xyz";
 const DEFAULT_NAMESPACE = "sabi";
 const DEFAULT_OPENAI_MODELS = "gpt-5,gpt-5-mini";
+const DEFAULT_GROQ_MODELS = "qwen/qwen3.8-27b,openai/gpt-oss-120b";
 
 function read(name: string): string {
   return (process.env[name] ?? "").trim();
@@ -43,6 +47,8 @@ export function getEnv(): SabiEnv {
     anthropicKey: read("ANTHROPIC_API_KEY"),
     openaiKey: read("OPENAI_API_KEY"),
     openaiModels: read("OPENAI_MODEL") || DEFAULT_OPENAI_MODELS,
+    groqKey: read("GROQ_API_KEY"),
+    groqModels: read("GROQ_MODEL") || DEFAULT_GROQ_MODELS,
     googleClientId: read("GOOGLE_CLIENT_ID") || read("NEXT_PUBLIC_GOOGLE_CLIENT_ID"),
     enokiKey: read("ENOKI_API_KEY"),
     sessionSecret: read("SABI_SESSION_SECRET"),
@@ -88,13 +94,14 @@ export function missingVars(env = getEnv()): MissingVar[] {
       why: "signs the session cookie; without it, sign-in silently breaks across restarts/instances",
       where: "any long random string, e.g. `openssl rand -hex 32`",
     });
-  // Either provider is enough. The switcher offers whichever keys are present,
-  // and the memory tools are identical on both - that is the point of the demo.
-  if (!env.anthropicKey && !env.openaiKey)
+  // Any one provider is enough. The switcher offers whichever keys are present,
+  // and the memory tools are identical on all of them - that is the point of the demo.
+  if (!env.anthropicKey && !env.openaiKey && !env.groqKey)
     out.push({
-      name: "ANTHROPIC_API_KEY or OPENAI_API_KEY",
-      why: "one model provider key - the switcher offers whichever you set (both is fine)",
-      where: "https://console.anthropic.com or https://platform.openai.com/api-keys",
+      name: "ANTHROPIC_API_KEY, OPENAI_API_KEY or GROQ_API_KEY",
+      why: "one model provider key - the switcher offers whichever you set (several is fine)",
+      where:
+        "https://console.anthropic.com, https://platform.openai.com/api-keys or https://console.groq.com/keys",
     });
   return out;
 }

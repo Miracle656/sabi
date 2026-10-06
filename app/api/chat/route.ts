@@ -12,11 +12,11 @@ import {
   type UIMessage,
 } from "ai";
 import { anthropic } from "@ai-sdk/anthropic";
-import { openai } from "@ai-sdk/openai";
+import { createOpenAI, openai } from "@ai-sdk/openai";
 import { z } from "zod";
 import { getEnv, missingVars } from "@/lib/env";
 import { SESSION_COOKIE, openSession } from "@/lib/session";
-import { CLAUDE_MODELS, DEFAULT_MODEL_ID, isClaudeModel, openaiModelIds } from "@/lib/models";
+import { DEFAULT_MODEL_ID, isClaudeModel, modelIds } from "@/lib/models";
 import { buildSystemPrompt } from "@/lib/sabi-prompt";
 import {
   FindingInputSchema,
@@ -34,6 +34,11 @@ interface Body {
   model?: string;
 }
 
+// Groq serves open-weight models behind an OpenAI-compatible Chat Completions
+// endpoint, so the installed OpenAI provider reaches it with a different base
+// URL. `.chat()` is required: the provider's default is the Responses API.
+const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
+
 /**
  * Pick the requested model, but only if its provider actually has a key. An
  * unknown or unkeyed id falls back to a provider that IS configured rather than
@@ -44,13 +49,18 @@ function resolveModel(id: string | undefined): { model: LanguageModel; id: strin
   const env = getEnv();
   const hasClaude = Boolean(env.anthropicKey);
   const hasOpenAI = Boolean(env.openaiKey);
-  const openaiIds = openaiModelIds(env.openaiModels);
+  const hasGroq = Boolean(env.groqKey);
+  const openaiIds = modelIds(env.openaiModels);
+  const groqIds = modelIds(env.groqModels);
+  const groq = createOpenAI({ name: "groq", baseURL: GROQ_BASE_URL, apiKey: env.groqKey });
   const wanted = (id ?? "").trim();
 
   if (hasClaude && isClaudeModel(wanted)) return { model: anthropic(wanted), id: wanted };
   if (hasOpenAI && openaiIds.includes(wanted)) return { model: openai(wanted), id: wanted };
+  if (hasGroq && groqIds.includes(wanted)) return { model: groq.chat(wanted), id: wanted };
   if (hasClaude) return { model: anthropic(DEFAULT_MODEL_ID), id: DEFAULT_MODEL_ID };
   if (hasOpenAI && openaiIds[0]) return { model: openai(openaiIds[0]), id: openaiIds[0] };
+  if (hasGroq && groqIds[0]) return { model: groq.chat(groqIds[0]), id: groqIds[0] };
   // missingVars() rejects the request before this can be reached.
   throw new Error("No model provider is configured.");
 }

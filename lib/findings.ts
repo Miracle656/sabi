@@ -40,7 +40,16 @@ export const STALE_AFTER_DAYS = 60;
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 // Walrus blob ids are base64url; memory ids must never carry grammar characters.
-const MEMORY_ID = /^[A-Za-z0-9_-]{1,120}$/;
+// The 8-char floor rejects list positions ("2") a model passes instead of an id.
+const MEMORY_ID = /^[A-Za-z0-9_-]{8,120}$/;
+// What a model sends for an optional string it means to leave empty. These all
+// match MEMORY_ID's alphabet, and "SUPERSEDES:null" reached Walrus on 2026-08-27.
+const NO_MEMORY_ID = /^(null|none|nil|undefined|n\/a|na|-)?$/i;
+
+/** A SUPERSEDES value that can actually name a memory. */
+export function isMemoryId(s: string): boolean {
+  return MEMORY_ID.test(s) && !NO_MEMORY_ID.test(s);
+}
 
 /** Calendar-valid YYYY-MM-DD (rejects 2026-02-30, 2026-13-01, ...). */
 export function isValidISODate(s: string): boolean {
@@ -100,10 +109,14 @@ export const FindingInputSchema = z.object({
     .optional()
     .describe("Handle of the member who verified it. Omit to attribute to this instance's reporter."),
   supersedes_memory_id: z
-    .string()
-    .trim()
-    .regex(MEMORY_ID, "supersedes_memory_id must be a memory id (base64url blob id)")
-    .optional()
+    .preprocess(
+      (v) => (v == null || (typeof v === "string" && NO_MEMORY_ID.test(v.trim())) ? undefined : v),
+      z
+        .string()
+        .trim()
+        .regex(MEMORY_ID, "supersedes_memory_id must be a memory id (base64url blob id)")
+        .optional(),
+    )
     .describe("memory_id of the active finding this one replaces, if any."),
 });
 export type FindingInput = z.infer<typeof FindingInputSchema>;
@@ -274,8 +287,12 @@ export function parseFinding(text: string): Finding | null {
   };
   for (const extra of extras) {
     if (extra.startsWith("by:")) out.reportedBy = extra.slice(3).trim();
-    else if (extra.startsWith("SUPERSEDES:"))
-      out.supersedes = extra.slice("SUPERSEDES:".length).trim();
+    else if (extra.startsWith("SUPERSEDES:")) {
+      // Rows stored before the input gate existed carry "SUPERSEDES:null"; a
+      // pointer that names nothing is no pointer.
+      const id = extra.slice("SUPERSEDES:".length).trim();
+      if (isMemoryId(id)) out.supersedes = id;
+    }
   }
   return out;
 }
