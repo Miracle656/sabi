@@ -8,8 +8,8 @@ import { walruscanUrl, type Network } from "@/lib/links";
 import type { ModelOption } from "@/lib/models";
 import { Markdown } from "./markdown";
 import { FindingCard, Handle, IdChip, SavedCard, ViewerProvider } from "./memory-card";
-import { ThemeToggle } from "./theme-toggle";
-import { SignIn, type SabiUser } from "./sign-in";
+import { SiteNav, Sidebar } from "./site-nav";
+import type { SabiUser } from "./sign-in";
 
 // ── tool part shapes (mirror what the chat route's tools return) ────────────
 
@@ -178,7 +178,6 @@ export function SabiApp({
     <ViewerProvider value={{ handle: user?.handle }}>
     <div className="flex h-[100dvh] flex-col overflow-hidden">
       <Topbar
-        namespace={namespace}
         mode={mode}
         network={network}
         reporter={reporter}
@@ -192,6 +191,7 @@ export function SabiApp({
       />
 
       <div className="flex min-h-0 flex-1">
+        <Sidebar active="home" user={user} from="xl" />
         <main className="relative flex min-w-0 flex-1 flex-col">
           <div ref={listRef} className="flex-1 overflow-y-auto">
             <div className="mx-auto w-full max-w-[var(--composer-max)] px-5 pb-52 pt-9 sm:px-6">
@@ -234,6 +234,9 @@ export function SabiApp({
           </div>
 
           <Composer
+            models={models}
+            modelId={modelId}
+            onModel={setModelId}
             value={input}
             onChange={setInput}
             onSend={() => send(input)}
@@ -269,8 +272,8 @@ export function SabiApp({
 
 // ── top bar ─────────────────────────────────────────────────────────────────
 
+/** The shared nav, carrying the chat-only controls: network, model, ledger. */
 function Topbar(props: {
-  namespace: string;
   mode: "live" | "mock";
   network: Network;
   reporter: string;
@@ -284,101 +287,75 @@ function Topbar(props: {
 }) {
   const live = props.mode === "live";
   return (
-    <header className="shrink-0 border-b border-line">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-4 py-2.5 sm:h-[var(--topbar-h)] sm:flex-nowrap sm:gap-3 sm:px-6 sm:py-0 lg:px-10">
-        <div className="flex min-w-0 shrink items-center gap-2 whitespace-nowrap sm:gap-3">
-          <Mark />
-          <span className="display text-[19px] font-medium">Sabi</span>
-          <span className="hidden h-[18px] w-px bg-line2 md:block" />
-          <span className="mono hidden truncate text-[12.5px] text-muted md:block">
-            ns:{props.namespace}
-          </span>
-          <span
-            className={`inline-flex items-center gap-1.5 text-[12.5px] ${
-              live ? "text-ok" : "text-warn"
-            }`}
-            title={
-              live
-                ? `Live — writing to Walrus on ${props.network}`
-                : "Mock — in-memory only, nothing reaches Walrus"
-            }
-          >
-            <span
-              className="h-1.5 w-1.5 rounded-full"
-              style={{ background: live ? "var(--ok)" : "var(--warn)" }}
-            />
-            {live ? props.network : "mock"}
-          </span>
-        </div>
-
-        <span className="grow" />
-
-        <div className="ml-auto flex min-w-0 items-center gap-2 sm:ml-0 sm:gap-3">
-        {/* Anonymous writes still carry SABI_REPORTER, so the chip stays
-            visible until someone actually signs in - sign-in being available
-            must not hide who unattributed findings would be blamed on. */}
-        {!props.user && (
-          <span
-            className="mono hidden text-[12px] text-faint xl:block"
-            title="Findings you store are signed off with this handle"
-          >
-            {props.reporter}
-          </span>
-        )}
-        <a
-          href="/community"
-          className="hidden text-[13px] text-muted transition-colors hover:text-ink sm:inline"
-        >
-          Community
-        </a>
-        {(props.googleClientId || props.user) && (
-          <SignIn user={props.user} clientId={props.googleClientId} />
-        )}
-
-        <select
-          value={props.modelId}
-          onChange={(e) => props.onModel(e.target.value)}
-          aria-label="Model"
-          className="max-w-[9.5rem] cursor-pointer truncate rounded-[var(--r)] border border-edge bg-transparent px-2.5 py-1.5 text-[13px] text-ink transition-colors hover:bg-soft sm:max-w-none"
-        >
-          {props.models.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.label}
-            </option>
-          ))}
-        </select>
-
-        <ThemeToggle />
-
-        <button
-          type="button"
-          onClick={props.onToggleWall}
-          title={props.wallOpen ? "Hide the ledger" : "Show the ledger"}
-          aria-pressed={props.wallOpen}
-          className={`inline-flex h-8 items-center gap-2 rounded-[var(--r)] border border-line2 px-2.5 text-[13px] transition-colors hover:bg-soft ${
-            props.wallOpen ? "text-ink" : "text-faint"
-          }`}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <rect x="3" y="4" width="18" height="16" rx="2" />
-            <path d="M15 4v16" />
-          </svg>
-          <span className="hidden sm:inline">Ledger</span>
-        </button>
-        </div>
-      </div>
-    </header>
+    <SiteNav user={props.user} googleClientId={props.googleClientId} active="home" sidebarFrom="xl">
+      <span
+        className={`hidden items-center gap-1.5 text-[12.5px] lg:inline-flex ${live ? "text-ok" : "text-warn"}`}
+        title={live ? `Live — writing to Walrus on ${props.network}` : "Mock — in-memory only, nothing reaches Walrus"}
+      >
+        <span className="h-1.5 w-1.5 rounded-full" style={{ background: live ? "var(--ok)" : "var(--warn)" }} />
+        {live ? props.network : "mock"}
+      </span>
+      {/* Anonymous writes still carry SABI_REPORTER, so say whose name they
+          would carry until someone actually signs in. */}
+      {!props.user && (
+        <span className="mono hidden text-[12px] text-faint 2xl:block" title="Findings you store are signed off with this handle">
+          {props.reporter}
+        </span>
+      )}
+      <select
+        value={props.modelId}
+        onChange={(e) => props.onModel(e.target.value)}
+        aria-label="Model"
+        className="hidden max-w-[11rem] shrink-0 cursor-pointer truncate rounded-[var(--r)] border border-edge bg-transparent px-2.5 py-1.5 text-[13px] text-ink transition-colors hover:bg-soft sm:block"
+      >
+        {props.models.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.label}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        onClick={props.onToggleWall}
+        title={props.wallOpen ? "Hide the ledger" : "Show the ledger"}
+        aria-label="Ledger"
+        aria-pressed={props.wallOpen}
+        className={`grid h-8 w-8 shrink-0 place-items-center rounded-[var(--r)] border border-line2 transition-colors hover:bg-soft ${
+          props.wallOpen ? "text-ink" : "text-faint"
+        }`}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <rect x="3" y="4" width="18" height="16" rx="2" />
+          <path d="M15 4v16" />
+        </svg>
+      </button>
+    </SiteNav>
   );
 }
 
-function Mark() {
+/** Phones hide the header switcher; the model still has to be choosable. */
+function MobileModel({
+  models,
+  modelId,
+  onModel,
+}: {
+  models: ModelOption[];
+  modelId: string;
+  onModel: (id: string) => void;
+}) {
   return (
-    <svg width="26" height="26" viewBox="0 0 26 26" fill="none" className="shrink-0" aria-hidden="true">
-      <rect x="0.5" y="0.5" width="25" height="25" rx="7" stroke="var(--line2)" />
-      <rect x="6" y="7" width="14" height="2" rx="1" fill="var(--ok)" />
-      <rect x="6" y="12" width="10" height="2" rx="1" fill="var(--muted)" />
-      <rect x="6" y="17" width="6" height="2" rx="1" fill="var(--faint)" />
-    </svg>
+    <select
+      value={modelId}
+      onChange={(e) => onModel(e.target.value)}
+      aria-label="Model"
+      className="mb-2 max-w-full cursor-pointer truncate rounded-[var(--r)] border border-edge bg-[var(--composer-fill)] px-2.5 py-1.5 text-[12.5px] text-ink sm:hidden"
+    >
+      {models.map((m) => (
+        <option key={m.id} value={m.id}>
+          {m.label}
+        </option>
+      ))}
+    </select>
   );
 }
 
@@ -745,12 +722,18 @@ function ActivityRow({
 // ── composer ────────────────────────────────────────────────────────────────
 
 function Composer({
+  models,
+  modelId,
+  onModel,
   value,
   onChange,
   onSend,
   onStop,
   busy,
 }: {
+  models: ModelOption[];
+  modelId: string;
+  onModel: (id: string) => void;
   value: string;
   onChange: (v: string) => void;
   onSend: () => void;
@@ -779,6 +762,7 @@ function Composer({
         }}
         className="pointer-events-auto mx-auto w-full max-w-[var(--composer-max)]"
       >
+        <MobileModel models={models} modelId={modelId} onModel={onModel} />
         <div className="flex items-end gap-2.5 rounded-[14px] border border-edge bg-[var(--composer-fill)] py-2.5 pl-4 pr-2.5 shadow-[var(--shadow)]">
           <textarea
             ref={ta}

@@ -64,7 +64,16 @@ export interface SabiUser {
   address?: string;
 }
 
-export function SignIn({ user, clientId }: { user?: SabiUser; clientId?: string }) {
+export function SignIn({
+  user,
+  clientId,
+  compact = false,
+}: {
+  user?: SabiUser;
+  clientId?: string;
+  /** The nav already shows who is signed in: render only the sign-out control. */
+  compact?: boolean;
+}) {
   const router = useRouter();
   const [err, setErr] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -142,6 +151,29 @@ export function SignIn({ user, clientId }: { user?: SabiUser; clientId?: string 
   }, [err]);
 
   if (!clientId && !user) return null;
+
+  if (user && compact) {
+    return (
+      <span className="flex items-center">
+        <button
+          type="button"
+          onClick={signOut}
+          title={`Sign out ${user.handle}`}
+          aria-label="Sign out"
+          className="grid h-8 w-8 place-items-center rounded-[var(--r)] text-muted transition-colors hover:bg-soft hover:text-ink"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+            <path d="M15 4h3a2 2 0 012 2v12a2 2 0 01-2 2h-3M10 17l5-5-5-5M15 12H4" />
+          </svg>
+        </button>
+        {err && (
+          <span role="status" className="max-w-[10rem] truncate text-[12px] text-bad" title={err}>
+            {err}
+          </span>
+        )}
+      </span>
+    );
+  }
 
   if (user) {
     return (

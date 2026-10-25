@@ -1,12 +1,12 @@
 // One member's record: level, points, what they verified and what they
 // reproduced for others. Derived from the community index like /community.
 
-import { cookies } from "next/headers";
 import { sameHandle } from "@/lib/findings";
 import { communityIndex } from "@/lib/community";
-import { defaultNamespace, mode, network } from "@/lib/memwal";
+import { mode, network } from "@/lib/memwal";
 import { LEVELS, findContributor, levelRank } from "@/lib/reputation";
-import { SESSION_COOKIE, openSession } from "@/lib/session";
+import { viewer } from "@/lib/viewer";
+import { Identicon } from "@/components/identicon";
 import { FindingCard, ViewerProvider } from "@/components/memory-card";
 import { LevelTag, PageShell } from "@/components/page-shell";
 
@@ -16,15 +16,16 @@ export const maxDuration = 120;
 export default async function ProfilePage(props: { params: Promise<{ handle: string }> }) {
   const raw = decodeURIComponent((await props.params).handle).replace(/^@+/, "");
   const handle = `@${raw}`;
-  const namespace = defaultNamespace();
-  const session = openSession((await cookies()).get(SESSION_COOKIE)?.value);
+  const who = await viewer();
+  const isYou = sameHandle(who.user?.handle, handle);
+  const shell = { ...who, active: isYou ? undefined : ("members" as const) };
 
   let index;
   try {
-    index = await communityIndex(namespace);
+    index = await communityIndex();
   } catch (err) {
     return (
-      <PageShell namespace={namespace}>
+      <PageShell {...shell}>
         <h1 className="display text-[34px] font-normal">{handle}</h1>
         <p className="mt-4 max-w-[60ch] text-[14px] text-warn">
           Couldn&apos;t reach Walrus Memory ({err instanceof Error ? err.message : String(err)}). Try
@@ -48,16 +49,13 @@ export default async function ProfilePage(props: { params: Promise<{ handle: str
   const level = me?.level ?? LEVELS[0];
   const next = LEVELS[levelRank(level.id) + 1];
   const rank = me ? index.contributors.indexOf(me) + 1 : null;
-  const isYou = sameHandle(session?.handle, handle);
 
   return (
-    <PageShell namespace={namespace}>
-      <ViewerProvider value={{ handle: session?.handle }}>
+    <PageShell {...shell}>
+      <ViewerProvider value={{ handle: who.user?.handle }}>
         <div className="flex flex-col gap-5 border-b border-line pb-8">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="grid h-12 w-12 place-items-center rounded-full bg-soft text-[18px] uppercase text-muted">
-              {raw.slice(0, 1)}
-            </span>
+            <Identicon seed={me?.handle ?? handle} size={64} />
             <div className="flex flex-col gap-1">
               <h1 className="display text-[30px] font-normal leading-tight sm:text-[36px]">
                 {me?.handle ?? handle}
