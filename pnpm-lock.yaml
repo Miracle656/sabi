@@ -21,8 +21,8 @@ importers:
         specifier: 1.30.0
         version: 1.30.0(zod@3.25.76)
       '@mysten-incubation/memwal':
-        specifier: 0.1.3
-        version: 0.1.3(@mysten/seal@1.4.4(@mysten/sui@2.26.2(typescript@5.9.3)))(@mysten/sui@2.26.2(typescript@5.9.3))(@mysten/walrus@1.2.19(@mysten/sui@2.26.2(typescript@5.9.3)))(ai@6.0.264(zod@3.25.76))(zod@3.25.76)
+        specifier: 0.1.9
+        version: 0.1.9(@mysten/seal@1.4.4(@mysten/sui@2.26.2(typescript@5.9.3)))(@mysten/sui@2.26.2(typescript@5.9.3))(@mysten/walrus@1.2.19(@mysten/sui@2.26.2(typescript@5.9.3)))(ai@6.0.264(zod@3.25.76))(zod@3.25.76)
       '@mysten/seal':
         specifier: 1.4.4
         version: 1.4.4(@mysten/sui@2.26.2(typescript@5.9.3))
@@ -486,8 +486,9 @@ packages:
       '@cfworker/json-schema':
         optional: true
 
-  '@mysten-incubation/memwal@0.1.3':
-    resolution: {integrity: sha512-NfiMWV+FzpQa+uNiP3D32YiTebULtVg9FW9E6oQSTqaa3yIIVjbeytUQx5hKnvy0dB9YYjnoTNPRKZ3Mi0jUAA==}
+  '@mysten-incubation/memwal@0.1.9':
+    resolution: {integrity: sha512-wHB++jSYrAZnx/NcV6Tpb3QPrL3IsrpMYNpP0oqngHR2u+z4IhUX9QTK0h+VVjdShI4rYdIw7gft4TNwL3+zHw==}
+    engines: {node: '>=20.0.0'}
     peerDependencies:
       '@mysten/seal': '>=1.1.0'
       '@mysten/sui': '>=2.5.0'
@@ -1657,7 +1658,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@mysten-incubation/memwal@0.1.3(@mysten/seal@1.4.4(@mysten/sui@2.26.2(typescript@5.9.3)))(@mysten/sui@2.26.2(typescript@5.9.3))(@mysten/walrus@1.2.19(@mysten/sui@2.26.2(typescript@5.9.3)))(ai@6.0.264(zod@3.25.76))(zod@3.25.76)':
+  '@mysten-incubation/memwal@0.1.9(@mysten/seal@1.4.4(@mysten/sui@2.26.2(typescript@5.9.3)))(@mysten/sui@2.26.2(typescript@5.9.3))(@mysten/walrus@1.2.19(@mysten/sui@2.26.2(typescript@5.9.3)))(ai@6.0.264(zod@3.25.76))(zod@3.25.76)':
     dependencies:
       '@mysten/seal': 1.4.4(@mysten/sui@2.26.2(typescript@5.9.3))
       '@mysten/sui': 2.26.2(typescript@5.9.3)

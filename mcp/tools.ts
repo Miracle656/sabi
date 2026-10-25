@@ -8,20 +8,15 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import { getEnv } from "../lib/env";
 import { buildSystemPrompt } from "../lib/sabi-prompt";
+import { todayISO } from "../lib/findings";
+import { defaultNamespace, mode, searchFindings } from "../lib/memwal";
 import {
-  FindingInputSchema,
-  formatFinding,
-  secretInFinding,
-  toFinding,
-  todayISO,
-} from "../lib/findings";
-import {
-  defaultNamespace,
-  explainStoreFailure,
-  mode,
-  searchFindings,
-  storeFinding,
-} from "../lib/memwal";
+  ConfirmInputSchema,
+  RememberInputSchema,
+  confirmAction,
+  rememberAction,
+  type WriteResult,
+} from "../lib/actions";
 
 function text(value: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] };
@@ -31,6 +26,19 @@ function failure(message: string) {
 }
 function describe(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+function write(res: WriteResult) {
+  if (res.status === "error") return failure(res.error);
+  return text({
+    ...res,
+    mode: mode(),
+    // A client must never relay a mock write as durable storage.
+    warning:
+      mode() === "mock"
+        ? "MOCK MODE: stored in-memory only - nothing reached Walrus and this id is not a Walrus blob."
+        : undefined,
+  });
 }
 
 export function registerSabi(server: McpServer): void {
@@ -75,42 +83,23 @@ export function registerSabi(server: McpServer): void {
     {
       title: "Store a verified finding",
       description:
-        "Store ONE verified, reproducible finding as a durable memory on Walrus. Only after the user confirms they reproduced the issue or the fix themselves. Run recall_findings on the subject first; if an active memory contradicts this one, pass its memory_id as supersedes_memory_id (storage is append-only - nothing is deleted).",
+        "Store ONE verified, reproducible finding as a durable memory on Walrus. Only after the user confirms they reproduced the issue or the fix themselves. Run recall_findings on the subject first; if an active memory contradicts this one, pass its memory_id as supersedes_memory_id (storage is append-only - nothing is deleted). If an active memory already says the same thing, use confirm_finding instead.",
       // Attribution is NOT client-controlled: every finding stored through this
       // server is signed off as SABI_REPORTER, exactly as in the web app.
-      inputSchema: FindingInputSchema.omit({ reported_by: true }).shape,
+      inputSchema: RememberInputSchema.shape,
     },
-    async (input) => {
-      const today = todayISO();
-      try {
-        const secret = secretInFinding(input);
-        if (secret) {
-          return failure(
-            `Refused: the finding looks like it contains a secret (${secret}). Strip it and try again.`,
-          );
-        }
-        const env = getEnv();
-        const finding = toFinding(input, { today, defaultReporter: env.reporter });
-        const line = formatFinding(finding);
-        const res = await storeFinding(line);
-        return text({
-          status: res.status,
-          memory_id: res.memory_id,
-          job_id: res.job_id,
-          namespace: res.namespace,
-          mode: mode(),
-          // A client must never relay a mock write as durable storage.
-          warning:
-            mode() === "mock"
-              ? "MOCK MODE: stored in-memory only - nothing reached Walrus and this id is not a Walrus blob."
-              : undefined,
-          text: line,
-          finding,
-        });
-      } catch (err) {
-        return failure(`store failed: ${await explainStoreFailure(err)}`);
-      }
+    async (input) => write(await rememberAction(input, { reporter: getEnv().reporter, today: todayISO() })),
+  );
+
+  server.registerTool(
+    "confirm_finding",
+    {
+      title: "Confirm an existing finding",
+      description:
+        "Record that the user reproduced an EXISTING active finding themselves. Use instead of remember_finding when recall already returned a finding that says the same thing. Credits the original author and moves the finding's last-verified date to today.",
+      inputSchema: ConfirmInputSchema.shape,
     },
+    async (input) => write(await confirmAction(input, { reporter: getEnv().reporter, today: todayISO() })),
   );
 
   server.registerPrompt(

@@ -1,12 +1,35 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import {
   STALE_AFTER_DAYS,
+  sameHandle,
   type Finding,
   type RecalledFinding,
 } from "@/lib/findings";
 import { aggregatorUrl, walruscanUrl, type Network } from "@/lib/links";
+
+// ── who is looking ──────────────────────────────────────────────────────────
+
+/** The signed-in viewer, if any: decides whether a card offers "This worked for me". */
+const ViewerContext = createContext<{ handle?: string }>({});
+export const ViewerProvider = ViewerContext.Provider;
+
+export function profileHref(handle: string): string {
+  return `/u/${encodeURIComponent(handle.replace(/^@+/, ""))}`;
+}
+
+/** A member handle that opens their profile. */
+export function Handle({ handle, className = "" }: { handle: string; className?: string }) {
+  return (
+    <a
+      href={profileHref(handle)}
+      className={`underline decoration-line2 underline-offset-2 transition-colors hover:text-ink hover:decoration-ink ${className}`}
+    >
+      {handle}
+    </a>
+  );
+}
 
 // ── memory id ───────────────────────────────────────────────────────────────
 
@@ -91,9 +114,8 @@ export function IdChip({
 // ── freshness ───────────────────────────────────────────────────────────────
 
 /**
- * How much of a volatile finding's freshness window is left. This is the only
- * "confidence" Sabi honestly has: the canonical line records ONE verifier per
- * finding, so there is no confirm/dispute distribution to draw yet.
+ * How much of a volatile finding's freshness window is left, counted from its
+ * last verification - a confirmation by any member restarts the clock.
  */
 function Freshness({ ageDays, stale }: { ageDays: number; stale: boolean }) {
   // A verified date in the future is bad data, not maximum freshness.
@@ -206,7 +228,7 @@ export function FindingCard({
               <path d="M10.3 3.9L2.6 17a2 2 0 001.7 3h15.4a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z" />
             </svg>
             <span>
-              {CATEGORY_HELP[f.category] ?? "This one dey expire"} — make person re-confirm am
+              {CATEGORY_HELP[f.category] ?? "This can change"}. Get someone to re-confirm it
               before you plan around it.
             </span>
           </div>
@@ -218,7 +240,7 @@ export function FindingCard({
               <span className="grid h-[17px] w-[17px] place-items-center rounded-full bg-soft text-[8.5px] uppercase text-muted">
                 {f.reportedBy.replace(/^@/, "").slice(0, 1)}
               </span>
-              {f.reportedBy}
+              <Handle handle={f.reportedBy} />
             </span>
           ) : (
             <span>writer unknown</span>
@@ -230,21 +252,126 @@ export function FindingCard({
               does not expire
             </span>
           )}
-          <span className="text-muted">Verified {f.verifiedOn}</span>
+          <span className="text-muted">
+            Verified {hit.last_verified ?? f.verifiedOn}
+          </span>
           <span className="hidden sm:inline">{f.provider}</span>
           <span className="hidden md:inline">{f.version}</span>
           <span className="grow" />
           <IdChip id={hit.memory_id} network={network} mock={mock} />
         </div>
 
+        {!superseded && <Confirmations hit={hit} network={network} mock={mock} />}
+
         {f.supersedes && (
           <div className="mono text-[11.5px] text-faint">supersedes {f.supersedes}</div>
+        )}
+        {f.confirms && (
+          <div className="mono text-[11.5px] text-faint">confirms {f.confirms}</div>
         )}
         {hit.superseded_by && (
           <div className="mono text-[11.5px] text-faint">replaced by {hit.superseded_by}</div>
         )}
       </div>
     </article>
+  );
+}
+
+// ── confirmations ───────────────────────────────────────────────────────────
+
+/**
+ * Who else reproduced this, and the button to add yourself. A confirmation is
+ * a new blob with the viewer's name on it, so the button only appears for a
+ * signed-in member who has not written or already confirmed this finding.
+ */
+function Confirmations({
+  hit,
+  network,
+  mock,
+}: {
+  hit: RecalledFinding;
+  network: Network;
+  mock: boolean;
+}) {
+  const viewer = useContext(ViewerContext).handle;
+  const [state, setState] = useState<
+    | { kind: "idle" }
+    | { kind: "working" }
+    | { kind: "done"; id?: string }
+    | { kind: "error"; error: string }
+  >({ kind: "idle" });
+  const f = hit.finding!;
+  const others = (hit.confirmations ?? []).filter((c) => !c.self && c.by);
+  const people = [...new Map(others.map((c) => [c.by!.toLowerCase(), c.by!])).values()];
+  const mine =
+    sameHandle(viewer, f.reportedBy) ||
+    (hit.confirmations ?? []).some((c) => sameHandle(c.by, viewer));
+  const canConfirm = Boolean(viewer) && !mine && !f.confirms && state.kind !== "done";
+
+  if (!people.length && !canConfirm && state.kind !== "done") return null;
+
+  const confirm = async () => {
+    setState({ kind: "working" });
+    try {
+      const res = await fetch("/api/confirm", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ memory_id: hit.memory_id, subject: f.subject }),
+      });
+      const j = (await res.json()) as { status: string; memory_id?: string; error?: string };
+      if (j.status === "error") setState({ kind: "error", error: j.error ?? "confirmation failed" });
+      else setState({ kind: "done", id: j.memory_id });
+    } catch (err) {
+      setState({ kind: "error", error: err instanceof Error ? err.message : String(err) });
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[12.5px]">
+      {people.length > 0 && (
+        <span className="inline-flex flex-wrap items-center gap-x-1.5 text-muted">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" strokeWidth="2">
+            <path d="M20 6L9 17l-5-5" />
+          </svg>
+          Confirmed by
+          {people.slice(0, 3).map((h, i) => (
+            <span key={h}>
+              <Handle handle={h} />
+              {i < Math.min(people.length, 3) - 1 ? "," : ""}
+            </span>
+          ))}
+          {people.length > 3 && <span className="text-faint">+{people.length - 3}</span>}
+        </span>
+      )}
+      <span className="grow" />
+      {canConfirm && (
+        <button
+          type="button"
+          onClick={confirm}
+          disabled={state.kind === "working"}
+          title="Store a confirmation on Walrus under your name. Only if you reproduced it yourself."
+          className="inline-flex items-center gap-1.5 rounded-full border border-edge px-3 py-1 text-[12.5px] text-ink transition-colors hover:bg-soft disabled:opacity-60"
+        >
+          {state.kind === "working" ? (
+            <span className="spin block h-3 w-3 rounded-full border-[1.5px] border-track border-t-[var(--ok)]" />
+          ) : (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M20 6L9 17l-5-5" />
+            </svg>
+          )}
+          {state.kind === "working" ? "Storing on Walrus…" : "This worked for me"}
+        </button>
+      )}
+      {state.kind === "done" && (
+        <span className="inline-flex items-center gap-2 text-ok">
+          You confirmed this
+          {state.id && <IdChip id={state.id} network={network} tone="ok" mock={mock} />}
+        </span>
+      )}
+      {state.kind === "error" && (
+        <span className="basis-full text-bad [overflow-wrap:anywhere]">{state.error}</span>
+      )}
+    </div>
   );
 }
 
@@ -355,13 +482,13 @@ export function SavedCard({
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
-            I no store am
+            Not stored
           </span>
           <p className="text-[14px] leading-relaxed [overflow-wrap:anywhere]">{live.error}</p>
           <p className="text-[12.5px] text-faint">
             {mock
-              ? "Mock memory — nothing reach Walrus. Fix am and send am again."
-              : "Memory na append-only — nothing wey land Walrus fit comot. Fix am and send am again."}
+              ? "Mock memory: nothing reached Walrus. Fix it and send it again."
+              : "Nothing was written to Walrus. Fix it and send it again."}
           </p>
         </div>
       </article>
@@ -383,9 +510,7 @@ export function SavedCard({
               <span className="spin block h-3 w-3 rounded-full border-[1.5px] border-track border-t-warn" />
             )}
             {done
-              ? mock
-                ? "Stored in mock memory"
-                : "Stored on Walrus"
+              ? `${finding?.confirms ? "Confirmation stored" : "Stored"} ${mock ? "in mock memory" : "on Walrus"}`
               : "Relayer still uploading"}
           </span>
           <span className="grow" />
@@ -422,11 +547,12 @@ export function SavedCard({
         )}
 
         <div className="nums flex flex-wrap items-center gap-x-3.5 gap-y-2 border-t border-line pt-2.5 text-[12px] text-faint">
-          {finding?.reportedBy && <span className="text-muted">{finding.reportedBy}</span>}
+          {finding?.reportedBy && <Handle handle={finding.reportedBy} className="text-muted" />}
           {finding && <span>Verified {finding.verifiedOn}</span>}
           {finding?.supersedes && (
             <span className="mono">supersedes {finding.supersedes}</span>
           )}
+          {finding?.confirms && <span className="mono">confirms {finding.confirms}</span>}
           <span className="grow" />
           {!live.memoryId && jobId && (
             <span className="mono [overflow-wrap:anywhere]">

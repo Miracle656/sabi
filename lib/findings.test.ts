@@ -118,7 +118,9 @@ test("a finding whose text starts with FIX:/VERIFIED: still round-trips (parse f
 test("looksLikeSecret catches key shapes but not Sui object ids", () => {
   assert.equal(looksLikeSecret("set ANTHROPIC key sk-ant-api03-abcdefghijklmnopqrstuvwxyz"), "API key");
   assert.equal(looksLikeSecret("owner suiprivkey1qqqqqqqqqqqqqqqqqqqqqqqqqq"), "Sui private key");
-  assert.equal(looksLikeSecret("call me on 08031234567"), "Nigerian phone number");
+  assert.equal(looksLikeSecret("call me on 08031234567"), "phone number");
+  assert.equal(looksLikeSecret("call me on +44 7911 123456"), "phone number");
+  assert.equal(looksLikeSecret("reach me at +2348031234567"), "phone number");
   assert.equal(looksLikeSecret("password: hunter22"), "credential assignment");
   assert.equal(
     looksLikeSecret("package 0xcee7a6fd8de52ce645c38332bde23d4a30fd9426bc4681409733dd50958a24c6 aborts with code 0"),

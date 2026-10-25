@@ -12,6 +12,12 @@
 //
 // `by:` and `SUPERSEDES:` are optional. The memory id is the Walrus blob id the
 // relayer returns; it is the only stable identifier a recalled memory carries.
+//
+// A CONFIRMATION is the same line written by a second member who reproduced the
+// finding themselves, ending in `CONFIRMS:<memory_id>` instead of SUPERSEDES. It
+// repeats the original's fields so it embeds next to the original and recalls
+// with it; resolveHits folds it into the original, which moves the original's
+// last-verified date forward and credits the original's author.
 
 import { z } from "zod";
 
@@ -67,7 +73,7 @@ export const FindingInputSchema = z.object({
     .trim()
     .min(3)
     .max(120)
-    .describe("Short subject, e.g. 'WalletConnect relay on MTN 4G'."),
+    .describe("Short subject, e.g. 'WalletConnect relay on a mobile carrier'."),
   finding: z
     .string()
     .trim()
@@ -85,13 +91,13 @@ export const FindingInputSchema = z.object({
     .trim()
     .min(2)
     .max(80)
-    .describe("Carrier, bank, API, chain or provider, e.g. 'MTN NG', 'OPay API', 'Sui mainnet'."),
+    .describe("Carrier, bank, API, chain or provider, e.g. 'Vodafone UK', 'Stripe API', 'Sui mainnet'."),
   version_or_app: z
     .string()
     .trim()
     .min(1)
     .max(80)
-    .describe("Version, SDK, app or date context, e.g. 'walletconnect v2', 'OPay API v3', 'Aug 2026'."),
+    .describe("Version, SDK, app or date context, e.g. 'walletconnect v2', '@mysten/sui 2.26', 'Aug 2026'."),
   verified_on: z
     .string()
     .refine(isValidISODate, "verified_on must be a real YYYY-MM-DD date")
@@ -132,6 +138,8 @@ export interface Finding {
   volatile: boolean;
   reportedBy?: string;
   supersedes?: string;
+  /** Set on a confirmation: the memory this re-verifies. */
+  confirms?: string;
 }
 
 const SEP = " → ";
@@ -142,7 +150,7 @@ function clean(s: string): string {
   return s.replace(/\s*\n+\s*/g, " ").replace(/→/g, "->").replace(/\|/g, "/").trim();
 }
 
-/** Local calendar date (WAT in Lagos), not UTC - "today" must match the user's clock. */
+/** Local calendar date of the server, not UTC - "today" must match the user's clock. */
 export function todayISO(now: Date = new Date()): string {
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, "0");
@@ -159,7 +167,9 @@ const SECRET_PATTERNS: [RegExp, string][] = [
   [/\bsuiprivkey1[a-z0-9]{20,}/i, "Sui private key"],
   [/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/, "JWT"],
   [/\bAKIA[0-9A-Z]{16}\b/, "AWS access key"],
-  [/(?:^|[^\d])(?:\+?234|0)[789][01]\d{8}(?!\d)/, "Nigerian phone number"],
+  // International (+country code) and Nigerian local (080...) numbers.
+  [/(?:^|[^\w+])\+\d{1,3}[ -]?\d{3,4}[ -]?\d{3,4}[ -]?\d{0,4}(?!\d)/, "phone number"],
+  [/(?:^|[^\d])0[789][01]\d{8}(?!\d)/, "phone number"],
   [/\b(secret|password|passwd|api[_ -]?key|token)\s*[:=]\s*\S{6,}/i, "credential assignment"],
 ];
 
@@ -224,6 +234,7 @@ export function formatFinding(f: Finding): string {
   ];
   if (f.reportedBy) tail.push(`by:${f.reportedBy}`);
   if (f.supersedes) tail.push(`SUPERSEDES:${f.supersedes}`);
+  if (f.confirms) tail.push(`CONFIRMS:${f.confirms}`);
   return [
     `[${f.category}] ${f.subject}`,
     f.finding,
@@ -292,9 +303,45 @@ export function parseFinding(text: string): Finding | null {
       // pointer that names nothing is no pointer.
       const id = extra.slice("SUPERSEDES:".length).trim();
       if (isMemoryId(id)) out.supersedes = id;
+    } else if (extra.startsWith("CONFIRMS:")) {
+      const id = extra.slice("CONFIRMS:".length).trim();
+      if (isMemoryId(id)) out.confirms = id;
     }
   }
+  // Sabi never writes both; if a hand-made line does, it is a confirmation.
+  if (out.confirms) delete out.supersedes;
   return out;
+}
+
+/**
+ * The confirmation line for `target`, re-verified by `reporter` on `today`.
+ * Copies the target's fields so the line recalls alongside the original.
+ */
+export function toConfirmation(
+  target: Finding,
+  targetId: string,
+  opts: { reporter: string; today?: string },
+): Finding {
+  const reportedBy = normalizeReporter(opts.reporter);
+  return {
+    category: target.category,
+    subject: target.subject,
+    finding: target.finding,
+    fix: target.fix,
+    verifiedOn: opts.today ?? todayISO(),
+    provider: target.provider,
+    version: target.version,
+    volatile: target.volatile,
+    ...(reportedBy ? { reportedBy } : {}),
+    confirms: targetId,
+  };
+}
+
+/** Same person, whatever the @ and case. */
+export function sameHandle(a?: string, b?: string): boolean {
+  if (!a || !b) return false;
+  const n = (h: string) => h.replace(/^@+/, "").toLowerCase();
+  return n(a) === n(b);
 }
 
 function findLastIndex<T>(arr: T[], pred: (t: T) => boolean): number {
@@ -324,6 +371,15 @@ export function isStale(f: Finding, today: string): boolean {
   return f.volatile && age > STALE_AFTER_DAYS;
 }
 
+/** A second member's re-verification, folded into the finding it confirms. */
+export interface Confirmation {
+  memory_id: string;
+  by?: string;
+  on: string; // YYYY-MM-DD
+  /** The original author re-verifying their own finding: refreshes the date, earns nothing. */
+  self: boolean;
+}
+
 /** One recalled memory, enriched for the model and the UI. */
 export interface RecalledFinding {
   memory_id: string;
@@ -332,8 +388,14 @@ export interface RecalledFinding {
   finding: Finding | null;
   stale: boolean;
   age_days: number | null;
+  /** Relayer write time (RFC3339), when the relayer reports it. */
+  created_at?: string;
   /** Set when another recalled memory names this one in SUPERSEDES. */
   superseded_by?: string;
+  /** Re-verifications of this finding, oldest first. */
+  confirmations?: Confirmation[];
+  /** Newest of verifiedOn and every confirmation date; staleness runs from this. */
+  last_verified?: string;
 }
 
 /**
@@ -360,11 +422,64 @@ export function resolveSupersession(hits: RecalledFinding[]): {
   return { active, superseded };
 }
 
+/**
+ * Fold confirmations into the findings they confirm, then resolve supersession.
+ * A confirmation whose target was not recalled stays visible on its own - it is
+ * a complete finding line, just with a second verifier's name on it.
+ */
+export function resolveHits(
+  hits: RecalledFinding[],
+  today: string,
+): { active: RecalledFinding[]; superseded: RecalledFinding[] } {
+  const byId = new Map(hits.map((h) => [h.memory_id, { ...h }]));
+  const folded = new Set<string>();
+  for (const h of hits) {
+    const target = h.finding?.confirms ? byId.get(h.finding.confirms) : undefined;
+    if (!target?.finding || target.memory_id === h.memory_id) continue;
+    const c: Confirmation = {
+      memory_id: h.memory_id,
+      by: h.finding!.reportedBy,
+      on: h.finding!.verifiedOn,
+      self: sameHandle(h.finding!.reportedBy, target.finding.reportedBy),
+    };
+    target.confirmations = [...(target.confirmations ?? []), c].sort((a, b) =>
+      a.on < b.on ? -1 : a.on > b.on ? 1 : 0,
+    );
+    folded.add(h.memory_id);
+  }
+  const rest: RecalledFinding[] = [];
+  for (const h of byId.values()) {
+    if (folded.has(h.memory_id)) continue;
+    if (h.finding && h.confirmations?.length) {
+      const last = h.confirmations.reduce(
+        (max, c) => (c.on > max ? c.on : max),
+        h.finding.verifiedOn,
+      );
+      h.last_verified = last;
+      const age = daysBetween(last, today);
+      h.age_days = Number.isNaN(age) ? h.age_days : age;
+      h.stale = isStale({ ...h.finding, verifiedOn: last }, today);
+    }
+    rest.push(h);
+  }
+  return resolveSupersession(rest);
+}
+
+/** Distinct people other than the author who confirmed this finding. */
+export function confirmers(hit: RecalledFinding): string[] {
+  const out = new Set<string>();
+  for (const c of hit.confirmations ?? []) {
+    if (!c.self && c.by) out.add(c.by.toLowerCase());
+  }
+  return [...out];
+}
+
 export function enrich(
   memory_id: string,
   text: string,
   distance: number,
   today: string,
+  created_at?: string,
 ): RecalledFinding {
   const finding = parseFinding(text);
   const age = finding ? daysBetween(finding.verifiedOn, today) : Number.NaN;
@@ -375,5 +490,6 @@ export function enrich(
     finding,
     stale: finding ? isStale(finding, today) : false,
     age_days: Number.isNaN(age) ? null : age,
+    ...(created_at ? { created_at } : {}),
   };
 }

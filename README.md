@@ -1,16 +1,19 @@
-# Sabi — the community brain wey no dey forget
+# Sabi — the shared memory for developers
 
-A shared, verified memory of Nigerian web3 / fintech dev landmines — carrier-level
-WalletConnect blocking, OPay API quirks, RPC rate limits, offramp behaviour — stored
-on Walrus through Walrus Memory (MemWal) and recalled by **any** AI model.
+A shared, verified memory of the problems developers keep hitting — a mobile network
+blocking the WalletConnect relay, a payments API that disagrees with its docs, an RPC
+that starts rate-limiting, an SDK upgrade that breaks signing — stored on Walrus
+through Walrus Memory (MemWal) and recalled by **any** AI model.
 
-Every Lagos dev rediscovers the same landmines from scratch because the knowledge
-dies in Telegram scroll. Sabi stores each *verified* finding as a memory on Walrus
-and recalls it semantically when anyone describes a blocker. **The memory is the
-product; the agent is just the interface.**
+Live: **https://sabi-sage.vercel.app** · MCP endpoint: `https://sabi-sage.vercel.app/api/mcp`
 
-> The hackathon submission is [`PROMPT.md`](./PROMPT.md) — the copy-pasteable
-> system prompt and the memory rules. This app is the runtime you see it work in.
+Developers rediscover the same problems from scratch because the fix dies in a chat
+scrollback. Sabi stores each *verified* finding as a memory on Walrus, recalls it
+semantically when anyone describes a blocker, and lets other members confirm it when
+they reproduce it. **The memory is the product; the agent is just the interface.**
+
+> [`PROMPT.md`](./PROMPT.md) is the copy-pasteable system prompt and the memory
+> rules. This app is the runtime you see it work in.
 
 ## What it does
 
@@ -25,6 +28,13 @@ product; the agent is just the interface.**
 - **Append-only, but not stuck.** Walrus Memory has no delete. A newer finding
   names the old memory id in `SUPERSEDES:`; recall resolves the chain and hides
   the old one. Nothing is ever lost, it just stops being the answer.
+- **"This worked for me."** A signed-in member who reproduces a finding confirms
+  it with one click (or by telling Sabi). The confirmation is its own blob naming
+  the original in `CONFIRMS:`; recall folds it in, shows who confirmed it, and
+  restarts the staleness clock.
+- **Topics, contributors, levels.** `/community` groups current findings by topic,
+  ranks members by points and shows levels; `/u/<handle>` is a member's record.
+  All of it is recomputed from the memories themselves (see below).
 - **Different model. Same memory.** The header switcher swaps Claude Opus 5 /
   Claude Sonnet 5 / (optionally) OpenAI models / (optionally) open-weight models
   on Groq (`GROQ_API_KEY`, e.g. Qwen). The tools, namespace and
@@ -36,9 +46,39 @@ product; the agent is just the interface.**
   header. The palette is Cortex's, inverted token-for-token; the choice persists
   and is replayed before first paint, so there is no flash.
 
+## Community: topics, reputation, levels
+
+There is no database. `lib/community.ts` sweeps the namespace with one newest-first
+`recall()` per topic (8 × up to 100 rows, `sort: "recent"`, SDK 0.1.9), folds
+confirmations and supersessions, and caches the result per server instance for 3
+minutes. `listMemories()` (metadata only) counts what the namespace holds, so the page
+can say how much of it the sweep covered. Past roughly 800 memories that coverage
+drops below 100% and a real index (a table written on each store) becomes worth it.
+
+Reputation (`lib/reputation.ts`) rewards being confirmed, not posting:
+
+| | points |
+| --- | --- |
+| a finding you verified | 10 |
+| each distinct member who confirms one of yours | 5 |
+| confirming someone else's finding | 2 |
+| confirming your own | 0 (it only refreshes the date) |
+
+| Level | Rule | Unlocks |
+| --- | --- | --- |
+| Newcomer | no verified finding yet | |
+| Verifier | 1+ finding | |
+| Trusted | 3+ findings, confirmed by 2+ other members | replacing a finding 2+ other members confirmed |
+| Steward | 10+ findings, confirmed by 5+ other members | |
+
+Writes are also checked against the record: a `SUPERSEDES` id must be a memory
+that recall can find (a model once invented `noop0000`), and every write carries
+an idempotency key derived from its text, so a retried or double-clicked write
+lands once.
+
 ## MCP server
 
-The same two tools, exposed to any MCP client (Claude Desktop, Cursor, ...):
+The same three tools (recall, remember, confirm), exposed to any MCP client (Claude Desktop, Cursor, ...):
 
 ```bash
 pnpm mcp        # stdio server: tools recall_findings + remember_finding, prompt "sabi"
@@ -148,9 +188,9 @@ Volatile by default: `CARRIER PAYMENTS RPC EXCHANGE`. Stale after 60 days.
 | `pnpm test` | unit tests for the finding grammar + a guard that `PROMPT.md` matches the runtime prompt byte-for-byte |
 | `pnpm typecheck` | `tsc --noEmit` |
 
-## Multi-writer setup (the "shared brain" part)
+## Multi-writer setup (the "shared memory" part)
 
-One Walrus Memory account = one community brain. Writers are delegate keys on
+One Walrus Memory account = one community memory. Writers are delegate keys on
 that account (max 20, enforced by the MemWal contract).
 
 1. The community lead creates the account in the playground and keeps the owner
@@ -158,7 +198,7 @@ that account (max 20, enforced by the MemWal contract).
 2. A member runs `pnpm keygen`, keeps the private key as their own
    `MEMWAL_DELEGATE_KEY`, and sends the **public** key to the lead.
 3. The lead runs `pnpm add-member --pubkey <hex> --label "@member"`.
-4. The member sets `MEMWAL_ACCOUNT_ID` (the shared one), `MEMWAL_NAMESPACE=sabi`,
+4. The member sets `MEMWAL_ACCOUNT_ID` (the shared one), `MEMWAL_NAMESPACE=sabi-v2`,
    `SABI_REPORTER=@member`, and runs Sabi. Their findings land in the same
    namespace, attributed to them. `pnpm members` shows everyone on-chain.
 
@@ -177,13 +217,14 @@ pitch.
 - **Honour system, enforced by the prompt:** that a finding is *verified*. Any
   delegate can write anything; Sabi's discipline (recall first, store only what the
   user confirms they reproduced, attribute it, never store secrets) is what keeps the
-  brain clean. Revocation is the backstop (`pnpm add-member --remove`).
+  memory clean. Confirmations are the second opinion; revocation is the backstop (`pnpm add-member --remove`).
 - **The relayer sees plaintext.** It embeds and decrypts on every request; Walrus
   holds ciphertext. You can self-host the relayer.
-- **No delete.** Supersession and staleness are recall-time rules in
+- **No delete.** Supersession, confirmations and staleness are recall-time rules in
   `lib/findings.ts`. Old findings stay on Walrus forever, hidden but auditable.
 - **Attribution is by handle, not signature.** `by:@handle` comes from the
-  writer's `SABI_REPORTER` (the model cannot set it). The on-chain fact is which
+  signed-in Google session, or the writer's `SABI_REPORTER` when nobody is signed
+  in (the model cannot set it). Confirmations require sign-in. The on-chain fact is which
   *delegate key* wrote it.
 - **Secrets are refused twice.** The prompt forbids storing them and
   `looksLikeSecret()` in `lib/findings.ts` rejects API-key / private-key / JWT /
@@ -194,10 +235,10 @@ pitch.
 
 ## Demo script (3 beats, ~90 seconds)
 
-1. **Fresh session.** Ask: *"WalletConnect dey fail for my users on MTN. Any fix?"*
+1. **Fresh session.** Ask: *"WalletConnect keeps failing for users on one mobile network. Any fix?"*
    → the 🔍 chip fires → a finding card with FIX, verified date, `by:@…`, and the
    memory id → click `scan` to show the blob on Walruscan.
-2. **Store live.** Say: *"Confirmed today: OPay … ; the fix was …"* → Sabi asks at
+2. **Store live.** Say: *"Confirmed today: <provider> … ; the fix was …"* → Sabi asks at
    most one question → 💾 chip → green **SAVED TO WALRUS ✓** card with the new id.
    (If Sabi found an older contradicting finding, the card shows `supersedes <id>`.)
 3. **Reload the page** (a fresh chat — nothing of the old conversation is in
@@ -205,20 +246,21 @@ pitch.
    about the finding you just stored. It recalls it from Walrus, not from the chat.
    *"Different model. Same memory."*
 
-Bonus beat for a second device/member: store from their instance, recall from
-yours (`pnpm restore` if the index lags).
+Bonus beat for a second member: they sign in, hit **This worked for me** on your
+finding, and `/community` shows the confirmation and moves your points.
 
 ## Deploying
 
 Local `pnpm dev` is the demo target. The app is a plain Next.js app with
 server-only secrets, so it *can* deploy to Vercel (`MEMWAL_*` and API keys as
 project env vars) — but note `/api/chat` has **no authentication**: anyone who
-can reach the URL can spend your model credits and write into the shared brain
+can reach the URL can spend your model credits and write into the shared memory
 through your delegate key. Put it behind Vercel deployment protection or add
 auth before exposing it publicly. Not configured here on purpose.
 
 ## Credits
 
-Built on Walrus Memory (`@mysten-incubation/memwal`), Walrus, Seal and Sui, for
-the Walrus Memory hackathon at SuiHub Lagos. Lives inside the Cortex monorepo,
+Built on Walrus Memory (`@mysten-incubation/memwal`), Walrus, Seal and Sui, first
+for Walrus Sessions 8: Chatbots That Remember. Topics, confirmations and contributor
+levels came from feedback at a Sui Hub demo. Lives inside the Cortex monorepo,
 which is why the MemWal wiring was already battle-tested before Sabi existed.

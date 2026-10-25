@@ -26,9 +26,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sabi — the community brain wey no dey forget",
+  title: "Sabi — the shared memory for developers",
   description:
-    "Verified Nigerian web3 & fintech dev landmines, remembered on Walrus and recalled by any AI model.",
+    "Fixes developers verified themselves, remembered on Walrus Memory and recalled by any AI model.",
 };
 
 export const viewport: Viewport = {

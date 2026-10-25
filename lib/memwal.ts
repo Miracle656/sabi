@@ -1,14 +1,15 @@
 // THE ONLY FILE THAT TALKS TO THE MEMWAL SDK.
 //
-// Verified against @mysten-incubation/memwal 0.1.3 (see docs-notes.md):
+// Verified against @mysten-incubation/memwal 0.1.9 (see docs-notes.md):
 //   MemWal.create({ key, accountId, serverUrl, namespace })
-//   remember(text, ns?)            -> { job_id, status }          (202, async)
+//   remember(text, ns?, { idempotencyKey }) -> { job_id, status }  (202, async)
 //   waitForRememberJob(job_id, o)  -> { id, job_id?, blob_id, owner, namespace }
-//   rememberAndWait(text, ns?, o)  -> same as above
-//   recall({ query, limit, namespace, maxDistance }) -> { results: [{ blob_id, text, distance }], total }
+//   recall({ query, limit, namespace, maxDistance, sort })
+//                                  -> { results: [{ blob_id, text, distance, created_at? }], total }
+//   listMemories({ cursor, namespace }) -> metadata only (ids, dates), no text; live client only
 //   restore(ns, limit?)            -> { restored, skipped, total, ... }
 //   health()                       -> { status, ... }
-//   MemWalMock.create({ namespace }) implements the same surface, in memory.
+//   MemWalMock.create({ namespace }) implements the same surface (minus listMemories), in memory.
 //
 // The relayer does embedding + Seal encryption + Walrus upload + vector search.
 // We only sign requests with the delegate key. There is NO delete - storage is
@@ -16,16 +17,21 @@
 
 import { getEnv, type MemwalMode } from "./env";
 import type { Network } from "./links";
+import { createHash } from "node:crypto";
 import {
+  CATEGORIES,
   enrich,
-  resolveSupersession,
+  resolveHits,
   todayISO,
+  type Category,
   type RecalledFinding,
 } from "./findings";
 
 type MemwalModule = typeof import("@mysten-incubation/memwal");
 import type {
   HealthResult,
+  ListMemoriesOptions,
+  MemoriesResult,
   RecallParams,
   RecallResult,
   RememberAcceptedResult,
@@ -38,7 +44,11 @@ import type {
 // typing against this (instead of a union of the two classes) keeps the
 // overloaded `recall` callable.
 interface MemoryClient {
-  remember(text: string, namespace?: string): Promise<RememberAcceptedResult>;
+  remember(
+    text: string,
+    namespace?: string,
+    options?: { idempotencyKey?: string },
+  ): Promise<RememberAcceptedResult>;
   waitForRememberJob(
     jobId: string,
     opts?: { pollIntervalMs?: number; timeoutMs?: number },
@@ -47,6 +57,8 @@ interface MemoryClient {
   recall(params: RecallParams): Promise<RecallResult>;
   restore(namespace: string, limit?: number): Promise<RestoreResult>;
   health(): Promise<HealthResult>;
+  /** Live client only: the mock has no inventory walk. */
+  listMemories?(options?: ListMemoriesOptions): Promise<MemoriesResult>;
 }
 type AnyClient = MemoryClient;
 
@@ -217,10 +229,13 @@ async function retrying<T>(
   return fn();
 }
 
-/** Writes: retry ONLY the cold-client 401 (rejected before acceptance). */
-const withAuthRetry = <T,>(fn: () => Promise<T>) => retrying(fn, isColdAuth);
-/** Reads: also retry timeouts and dropped connections - idempotent. */
-const withReadRetry = <T,>(fn: () => Promise<T>) =>
+/**
+ * Reads, and writes that carry an idempotency key: also retry timeouts and
+ * dropped connections. Since 0.1.9 the relayer dedupes a repeated key, so a
+ * retried write that had already landed collapses onto the original job
+ * instead of storing the duplicate it stored on 2026-08-27.
+ */
+const withRetry = <T,>(fn: () => Promise<T>) =>
   retrying(fn, (e) => isColdAuth(e) || isTransientRead(e));
 
 export interface StoreResult {
@@ -230,14 +245,20 @@ export interface StoreResult {
   namespace: string;
 }
 
-/** Store one canonical finding line. Waits up to `timeoutMs` for the Walrus blob id. */
+/**
+ * Store one canonical finding line. Waits up to `timeoutMs` for the Walrus blob id.
+ * The idempotency key defaults to a hash of the text, so the same line stored
+ * twice - a retry, a double click, a second serverless instance - lands once.
+ */
 export async function storeFinding(
   text: string,
-  opts: { namespace?: string; timeoutMs?: number } = {},
+  opts: { namespace?: string; timeoutMs?: number; idempotencyKey?: string } = {},
 ): Promise<StoreResult> {
   const c = await client();
   const ns = opts.namespace ?? defaultNamespace();
-  const accepted = await withAuthRetry(() => c.remember(text, ns));
+  const idempotencyKey =
+    opts.idempotencyKey ?? createHash("sha256").update(text).digest("hex").slice(0, 48);
+  const accepted = await withRetry(() => c.remember(text, ns, { idempotencyKey }));
   try {
     const done = await c.waitForRememberJob(accepted.job_id, {
       timeoutMs: opts.timeoutMs ?? REMEMBER_TIMEOUT_MS,
@@ -256,7 +277,7 @@ export async function storeFinding(
 export async function jobStatus(jobId: string) {
   const c = await client();
   // Read-only: a transient failure here would make a landed write look failed.
-  return withReadRetry(() => c.getRememberStatus(jobId));
+  return withRetry(() => c.getRememberStatus(jobId));
 }
 
 /**
@@ -277,7 +298,7 @@ export async function searchFindings(
   // finding that retracts an old one is worded differently and may rank below
   // the old row for the original-symptom query. Over-fetch, resolve, then trim
   // to what the caller asked for.
-  const res = await withReadRetry(() =>
+  const res = await withRetry(() =>
     c.recall({
       query,
       limit: Math.min(Math.max(want * 3, RECALL_OVERFETCH_MIN), RECALL_OVERFETCH_MAX),
@@ -286,9 +307,103 @@ export async function searchFindings(
     }),
   );
   const today = opts.today ?? todayISO();
-  const hits = res.results.map((r) => enrich(r.blob_id, r.text, r.distance, today));
-  const { active, superseded } = resolveSupersession(hits);
+  const hits = res.results.map((r) => enrich(r.blob_id, r.text, r.distance, today, r.created_at));
+  const { active, superseded } = resolveHits(hits, today);
   return { active: active.slice(0, want), superseded, total: res.total };
+}
+
+/**
+ * Look one memory up by id. There is no get-by-id API, so this recalls around
+ * `hint` (the finding's subject or text) with no distance floor and picks the
+ * id out. Returns the hit with its confirmations folded in, or null.
+ */
+export async function findMemory(
+  id: string,
+  hint: string,
+  opts: { namespace?: string; today?: string } = {},
+): Promise<RecalledFinding | null> {
+  const c = await client();
+  const ns = opts.namespace ?? defaultNamespace();
+  const today = opts.today ?? todayISO();
+  const res = await withRetry(() => c.recall({ query: hint, limit: 100, namespace: ns }));
+  const hits = res.results.map((r) => enrich(r.blob_id, r.text, r.distance, today, r.created_at));
+  const { active, superseded } = resolveHits(hits, today);
+  return [...active, ...superseded].find((h) => h.memory_id === id) ?? null;
+}
+
+// One query per topic, worded like the findings that live there. Recall needs
+// a query, so the sweep asks every topic for its newest matches and unions them.
+const SWEEP_QUERIES: Record<Category, string> = {
+  CARRIER: "mobile carrier network operator data connection blocked ISP",
+  PAYMENTS: "payments API payout transfer checkout bank card webhook",
+  WALLET: "wallet connect sign transaction WalletConnect zkLogin extension",
+  RPC: "RPC node fullnode endpoint rate limit API key gas",
+  TOOLING: "SDK CLI build tooling library package version compile error",
+  REGULATORY: "regulation compliance KYC license policy requirement",
+  EXCHANGE: "exchange on-ramp off-ramp deposit withdrawal liquidity",
+  INFRA: "hosting server deploy cloud infrastructure DNS storage indexer",
+};
+const SWEEP_LIMIT = 100;
+const SWEEP_CONCURRENCY = 8;
+
+export interface Sweep {
+  hits: RecalledFinding[];
+  /** Memories the relayer lists for this namespace, when it can list (null = unknown). */
+  total: number | null;
+}
+
+/**
+ * Pull as much of the namespace as recall will give: one newest-first recall
+ * per topic, unioned by memory id. listMemories (metadata only) counts what
+ * exists, so callers can say how much of the namespace the sweep covered.
+ */
+export async function sweepNamespace(
+  opts: { namespace?: string; today?: string } = {},
+): Promise<Sweep> {
+  const c = await client();
+  const ns = opts.namespace ?? defaultNamespace();
+  const today = opts.today ?? todayISO();
+  warmIndex(c, ns);
+  const seen = new Map<string, RecalledFinding>();
+  // All topics at once: latency is per round-trip, not per row.
+  const queries = CATEGORIES.map((cat) => SWEEP_QUERIES[cat]);
+  for (let i = 0; i < queries.length; i += SWEEP_CONCURRENCY) {
+    const batch = await Promise.all(
+      queries
+        .slice(i, i + SWEEP_CONCURRENCY)
+        .map((query) =>
+          withRetry(() => c.recall({ query, limit: SWEEP_LIMIT, namespace: ns, sort: "recent" })),
+        ),
+    );
+    for (const res of batch) {
+      for (const r of res.results) {
+        if (!seen.has(r.blob_id)) {
+          seen.set(r.blob_id, enrich(r.blob_id, r.text, r.distance, today, r.created_at));
+        }
+      }
+    }
+  }
+  return { hits: [...seen.values()], total: await countMemories(c, ns) };
+}
+
+/** How many memories the namespace holds, or null when the client cannot list. */
+async function countMemories(c: AnyClient, ns: string): Promise<number | null> {
+  if (!c.listMemories) return null;
+  try {
+    let cursor: string | undefined;
+    let count = 0;
+    // The namespace filter is client-side, so walk until has_more says stop.
+    for (let page = 0; page < 40; page++) {
+      const res = await withRetry(() => c.listMemories!({ cursor, namespace: ns, limit: 500 }));
+      count += res.memories.length;
+      if (!res.has_more) return count;
+      cursor = res.next_cursor ?? undefined;
+    }
+    return null;
+  } catch {
+    // A relayer without the list route: coverage is simply unknown.
+    return null;
+  }
 }
 
 function warmIndex(c: AnyClient, ns: string) {

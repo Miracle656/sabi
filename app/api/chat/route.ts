@@ -18,14 +18,14 @@ import { getEnv, missingVars } from "@/lib/env";
 import { SESSION_COOKIE, openSession } from "@/lib/session";
 import { DEFAULT_MODEL_ID, isClaudeModel, modelIds } from "@/lib/models";
 import { buildSystemPrompt } from "@/lib/sabi-prompt";
+import { todayISO } from "@/lib/findings";
+import { searchFindings } from "@/lib/memwal";
 import {
-  FindingInputSchema,
-  formatFinding,
-  secretInFinding,
-  toFinding,
-  todayISO,
-} from "@/lib/findings";
-import { explainStoreFailure, searchFindings, storeFinding } from "@/lib/memwal";
+  ConfirmInputSchema,
+  RememberInputSchema,
+  confirmAction,
+  rememberAction,
+} from "@/lib/actions";
 
 export const maxDuration = 120;
 
@@ -129,34 +129,24 @@ export async function POST(req: Request) {
     }),
     remember_finding: tool({
       description:
-        "Store ONE verified, reproducible finding as a durable memory on Walrus. Only after the user confirms they reproduced the issue or the fix themselves. Run recall_findings on the subject first; if an active memory contradicts this one, pass its memory_id as supersedes_memory_id (storage is append-only - nothing is deleted).",
-      // Attribution is NOT model-controlled: every finding stored through this
-      // instance is signed off as env.reporter (the member running it).
-      inputSchema: FindingInputSchema.omit({ reported_by: true }),
-      execute: async (input) => {
-        try {
-          const secret = secretInFinding(input);
-          if (secret) {
-            return {
+        "Store ONE verified, reproducible finding as a durable memory on Walrus. Only after the user confirms they reproduced the issue or the fix themselves. Run recall_findings on the subject first; if an active memory contradicts this one, pass its memory_id as supersedes_memory_id (storage is append-only - nothing is deleted). If an active memory already says the same thing, use confirm_finding instead.",
+      // Attribution is NOT model-controlled: the reporter comes from the session.
+      inputSchema: RememberInputSchema,
+      execute: (input) => rememberAction(input, { reporter, today }),
+    }),
+    confirm_finding: tool({
+      description:
+        "Record that the signed-in user reproduced an EXISTING active finding themselves. Use instead of remember_finding when recall already returned a finding that says the same thing. Credits the original author and moves the finding's last-verified date to today.",
+      inputSchema: ConfirmInputSchema,
+      execute: async (input) =>
+        // An anonymous confirmation would carry the operator's name, which says
+        // nothing about who reproduced it.
+        session
+          ? confirmAction(input, { reporter, today })
+          : {
               status: "error" as const,
-              error: `Refused: the finding looks like it contains a secret (${secret}). Strip it and try again.`,
-            };
-          }
-          const finding = toFinding(input, { today, defaultReporter: reporter });
-          const text = formatFinding(finding);
-          const res = await storeFinding(text);
-          return {
-            status: res.status,
-            memory_id: res.memory_id,
-            job_id: res.job_id,
-            namespace: res.namespace,
-            text,
-            finding,
-          };
-        } catch (err) {
-          return { status: "error" as const, error: await explainStoreFailure(err) };
-        }
-      },
+              error: "Refused: confirmations carry the confirmer's name, so the user must sign in first.",
+            },
     }),
   };
 

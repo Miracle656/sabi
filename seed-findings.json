@@ -3,25 +3,25 @@
   "findings": [
     {
       "category": "CARRIER",
-      "subject": "PLACEHOLDER — WalletConnect v2 relay on MTN NG mobile data",
-      "finding": "PLACEHOLDER — replace: describe the exact behaviour you reproduced (e.g. wss://relay.walletconnect.com handshake never completes on MTN 4G; works on Wi-Fi and on Glo). Include the error string you saw.",
+      "subject": "PLACEHOLDER — WalletConnect v2 relay on a mobile carrier",
+      "finding": "PLACEHOLDER — replace: describe the exact behaviour you reproduced (e.g. wss://relay.walletconnect.com handshake never completes on one carrier's 4G; works on Wi-Fi and on other carriers). Include the error string you saw.",
       "fix": "PLACEHOLDER — replace: the fix you confirmed (e.g. point the SDK at a custom relay URL, or fall back to deep links).",
-      "network_or_provider": "MTN NG",
+      "network_or_provider": "Carrier name + country",
       "version_or_app": "walletconnect v2 / reown appkit x.y",
       "verified_on": "2026-08-01"
     },
     {
       "category": "PAYMENTS",
-      "subject": "PLACEHOLDER — OPay API behaviour on payouts",
+      "subject": "PLACEHOLDER — payments API behaviour on payouts",
       "finding": "PLACEHOLDER — replace: the quirk you reproduced (e.g. which endpoint, which status code, what the docs say vs what actually happens).",
       "fix": "PLACEHOLDER — replace: the workaround that worked for you, or 'none known'.",
-      "network_or_provider": "OPay API",
-      "version_or_app": "OPay merchant API v3",
+      "network_or_provider": "Payments provider API",
+      "version_or_app": "provider API version",
       "verified_on": "2026-08-10"
     },
     {
       "category": "RPC",
-      "subject": "PLACEHOLDER — Sui public fullnode rate limiting from Lagos",
+      "subject": "PLACEHOLDER — Sui public fullnode rate limiting",
       "finding": "PLACEHOLDER — replace: e.g. which RPC host returned 429s, at what request rate, from which ISP.",
       "fix": "PLACEHOLDER — replace: e.g. which RPC provider / plan held up.",
       "network_or_provider": "Sui mainnet",

@@ -7,7 +7,7 @@ import type { Finding, RecalledFinding } from "@/lib/findings";
 import { walruscanUrl, type Network } from "@/lib/links";
 import type { ModelOption } from "@/lib/models";
 import { Markdown } from "./markdown";
-import { FindingCard, IdChip, SavedCard } from "./memory-card";
+import { FindingCard, Handle, IdChip, SavedCard, ViewerProvider } from "./memory-card";
 import { ThemeToggle } from "./theme-toggle";
 import { SignIn, type SabiUser } from "./sign-in";
 
@@ -49,15 +49,16 @@ export interface ResolvedWrite {
 
 const RECALL = "tool-recall_findings";
 const STORE = "tool-remember_finding";
+const CONFIRM = "tool-confirm_finding";
 
 function isToolPart(p: { type: string }): p is ToolPart {
-  return p.type === RECALL || p.type === STORE;
+  return p.type === RECALL || p.type === STORE || p.type === CONFIRM;
 }
 
 const EXAMPLES = [
-  "WalletConnect dey fail for my users on MTN. Any fix?",
-  "Which OPay endpoint should I use for payouts, and wetin be the gotchas?",
-  "I confirm today say Airtel NG dey block the WalletConnect relay on 4G; custom relay URL fix am. WalletConnect v2, reown appkit.",
+  "WalletConnect keeps failing for users on one mobile network. Any known fix?",
+  "Which Sui RPC providers rate-limit hard, and what are the gotchas?",
+  "I reproduced a bug and found the fix. What do you need from me to store it?",
 ];
 
 export interface SabiAppProps {
@@ -174,6 +175,7 @@ export function SabiApp({
   const empty = messages.length === 0;
 
   return (
+    <ViewerProvider value={{ handle: user?.handle }}>
     <div className="flex h-[100dvh] flex-col overflow-hidden">
       <Topbar
         namespace={namespace}
@@ -208,7 +210,7 @@ export function SabiApp({
                       onWriteResolved={onWriteResolved}
                     />
                   ))}
-                  {thinking && <ActivityRow spinner>Sabi dey think&hellip;</ActivityRow>}
+                  {thinking && <ActivityRow spinner>Sabi is thinking&hellip;</ActivityRow>}
                   {error && (
                     <div className="flex items-start gap-2.5 rounded-[var(--r)] border border-line bg-bad-soft px-3.5 py-3 text-[13.5px] text-bad">
                       <svg
@@ -261,6 +263,7 @@ export function SabiApp({
         )}
       </div>
     </div>
+    </ViewerProvider>
   );
 }
 
@@ -322,6 +325,12 @@ function Topbar(props: {
             {props.reporter}
           </span>
         )}
+        <a
+          href="/community"
+          className="hidden text-[13px] text-muted transition-colors hover:text-ink sm:inline"
+        >
+          Community
+        </a>
         {(props.googleClientId || props.user) && (
           <SignIn user={props.user} clientId={props.googleClientId} />
         )}
@@ -384,6 +393,7 @@ interface RecentRow {
   fix: string;
   verifiedOn: string;
   reportedBy: string | null;
+  confirmations?: number;
 }
 
 function FirstRun({
@@ -420,31 +430,31 @@ function FirstRun({
 
   return (
     <div className="flex flex-col pt-6">
-      <h1 className="display max-w-[15ch] text-[33px] font-normal leading-[1.08] sm:text-[46px] lg:text-[52px]">
-        Ask before you burn a day on a landmine somebody don already hit.
+      <h1 className="display max-w-[16ch] text-[33px] font-normal leading-[1.08] sm:text-[46px] lg:text-[52px]">
+        Ask before you lose a day to a problem someone already solved.
       </h1>
       <p className="mt-5 max-w-[58ch] text-[16px] leading-relaxed text-muted">
-        Sabi na the community brain for Naija web3 and fintech devs. E dey check wetin people don
-        verify before e answer, and e only dey keep wetin you confirm say you reproduce yourself.
+        Sabi is a shared memory for developers. It checks what the community has verified before
+        it answers, and it only stores what you confirm you reproduced yourself.
       </p>
 
-      {/* How e dey work - three steps, hairline discipline, no colour spent. */}
+      {/* How it works - three steps, hairline discipline, no colour spent. */}
       <ol className="mt-7 grid max-w-[58ch] gap-4 sm:grid-cols-3 sm:gap-6">
         {[
           {
             n: "01",
             t: "Ask",
-            d: "Describe your blocker. Sabi go check community memory first and cite who verify wetin, and when.",
+            d: "Describe your blocker. Sabi checks community memory first and cites who verified what, and when.",
           },
           {
             n: "02",
             t: "Verify",
-            d: "Reproduce the issue or the fix yourself. Second-hand gist no dey enter - na you be the proof.",
+            d: "Reproduce the issue or the fix yourself. Second-hand reports are not stored; you are the proof.",
           },
           {
             n: "03",
             t: "Store",
-            d: "Talk say you confirm am. Sabi go keep am on Walrus with your name and date, for the next person.",
+            d: "Say you confirmed it. Sabi stores it on Walrus with your name and the date, for the next person.",
           },
         ].map((s) => (
           <li key={s.n} className="border-t border-line pt-3">
@@ -472,10 +482,10 @@ function FirstRun({
 
       <section className="mt-9 sm:mt-12">
         <div className="flex items-baseline justify-between border-b border-line pb-3">
-          <h2 className="text-[13px] font-medium">Some of wetin the community don verify</h2>
-          <span className="text-[12px] text-faint">
-            {mode === "mock" ? "mock memory" : "sampled from the namespace"}
-          </span>
+          <h2 className="text-[13px] font-medium">Recently verified</h2>
+          <a href="/community" className="text-[12px] text-faint hover:text-ink">
+            {mode === "mock" ? "mock memory · " : ""}See all topics &rarr;
+          </a>
         </div>
 
         {rows === null && (
@@ -493,8 +503,8 @@ function FirstRun({
         {rows !== null && rows.length === 0 && (
           <p className={`py-6 text-[13.5px] ${failed ? "text-warn" : "text-faint"}`}>
             {failed
-              ? "I no fit reach the memory to sample am — this no mean say the namespace empty."
-              : "Nothing dey the namespace yet. Verify one thing, tell Sabi, and e go be the first record."}
+              ? "Couldn't reach the memory. That doesn't mean the namespace is empty."
+              : "Nothing in the namespace yet. Verify one thing, tell Sabi, and it becomes the first record."}
           </p>
         )}
 
@@ -509,7 +519,8 @@ function FirstRun({
               <span className="text-[13px] text-faint">{r.fix}</span>
             </div>
             <div className="nums flex items-center gap-3 text-[12px] text-faint">
-              {r.reportedBy && <span>{r.reportedBy}</span>}
+              {r.reportedBy && <Handle handle={r.reportedBy} />}
+              {r.confirmations ? <span className="text-ok">+{r.confirmations} confirmed</span> : null}
               <span className={r.stale ? "text-warn" : "text-muted"}>
                 {r.verifiedOn}
                 {r.stale && " · stale"}
@@ -594,6 +605,7 @@ function ToolPartView({
   onWriteResolved: (callId: string, r: ResolvedWrite) => void;
 }) {
   const isRecall = part.type === RECALL;
+  const isConfirm = part.type === CONFIRM;
 
   if (part.state === "input-streaming" || part.state === "input-available") {
     // Stop/reload leaves a tool part with no output. Never spin forever.
@@ -607,10 +619,8 @@ function ToolPartView({
     return (
       <ActivityRow spinner>
         {isRecall
-          ? "Sabi dey check community memory…"
-          : mock
-            ? "Sabi dey store am for mock memory…"
-            : "Sabi dey store am for Walrus…"}
+          ? "Checking community memory…"
+          : `${isConfirm ? "Storing your confirmation" : "Storing it"} ${mock ? "in mock memory" : "on Walrus"}…`}
       </ActivityRow>
     );
   }
@@ -649,8 +659,8 @@ function ToolPartView({
 
         {active.length === 0 && (
           <p className="text-[13.5px] text-faint">
-            Community memory no get anything on this yet — whatever Sabi talk next na general
-            knowledge, nobody verify am.
+            Community memory has nothing on this yet. Anything Sabi says next is general knowledge
+            that nobody here has verified.
           </p>
         )}
 
@@ -781,7 +791,7 @@ function Composer({
               }
             }}
             rows={1}
-            placeholder="Describe the blocker, or tell Sabi wetin you verify…"
+            placeholder="Describe the blocker, or tell Sabi what you verified…"
             className="max-h-40 min-h-[38px] grow resize-none bg-transparent py-1.5 text-[16px] leading-relaxed outline-none [field-sizing:content] placeholder:text-muted sm:text-[15px]"
           />
           {busy ? (
@@ -821,8 +831,8 @@ function Composer({
             <rect x="4" y="10" width="16" height="10" rx="2" />
             <path d="M8 10V7a4 4 0 018 0v3" />
           </svg>
-          Sabi only dey store wetin you confirm say you reproduce — and nothing wey look like a key
-          or a phone number.
+          Sabi only stores what you confirm you reproduced, and nothing that looks like a key or a
+          phone number.
         </p>
       </form>
     </div>
@@ -854,7 +864,7 @@ function Ledger({
   const recalls = entries.filter((e) => e.part.type === RECALL).length;
   // Only a blob that actually landed counts as a write. Refused, failed and
   // still-uploading attempts are reported separately rather than tallied green.
-  const writes = entries.filter((e) => e.part.type === STORE);
+  const writes = entries.filter((e) => e.part.type !== RECALL);
   const stores = writes.filter((e) => {
     const out = e.part.output as StoreOutput | undefined;
     const r = resolved[e.part.toolCallId];
@@ -918,7 +928,7 @@ function Ledger({
           <path d="M3 9h18" />
         </svg>
         {mock
-          ? "Mock memory — these ids no dey Walrus."
+          ? "Mock memory: these ids are not on Walrus."
           : "Every row na one encrypted blob you fit open."}
       </div>
     </div>
@@ -993,7 +1003,9 @@ function LedgerItem({
   return (
     <div className="flex flex-col gap-1.5 border-b border-line px-6 py-3.5">
       <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.1em]">
-        <span className={isRecall ? "text-muted" : "text-ok"}>{isRecall ? "Recall" : "Store"}</span>
+        <span className={isRecall ? "text-muted" : "text-ok"}>
+          {isRecall ? "Recall" : part.type === CONFIRM ? "Confirm" : "Store"}
+        </span>
         <span className="mono tracking-normal text-faint">{time}</span>
       </div>
       {/* Prose stays in the body face; mono is reserved for ids and clocks. */}
