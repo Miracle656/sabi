@@ -65,9 +65,11 @@ export default async function CommunityPage(props: {
           </p>
           <p className="nums text-[12px] text-faint">
             {total === null
-              ? `Indexed ${indexed} memories`
+              ? `Indexed ${indexed} ${indexed === 1 ? "memory" : "memories"}`
               : indexed >= total
-                ? `Indexed all ${total} memories in the namespace`
+                ? total === 1
+                  ? "Indexed the only memory in the namespace"
+                  : `Indexed all ${total} memories in the namespace`
                 : `Indexed ${indexed} of ${total} memories; the rest are still searchable from chat`}
             {" · "}refreshed {new Date(index.builtAt).toUTCString().slice(17, 22)} UTC
           </p>
