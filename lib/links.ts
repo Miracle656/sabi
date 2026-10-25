@@ -14,3 +14,8 @@ export function aggregatorUrl(blobId: string, network: Network): string {
 export function walruscanUrl(blobId: string, network: Network): string {
   return `https://walruscan.com/${network}/blob/${encodeURIComponent(blobId)}`;
 }
+
+/** A member's profile page. Plain module so server pages and client cards can both call it. */
+export function profileHref(handle: string): string {
+  return `/u/${encodeURIComponent(handle.replace(/^@+/, ""))}`;
+}

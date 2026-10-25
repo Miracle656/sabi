@@ -7,17 +7,13 @@ import {
   type Finding,
   type RecalledFinding,
 } from "@/lib/findings";
-import { aggregatorUrl, walruscanUrl, type Network } from "@/lib/links";
+import { aggregatorUrl, profileHref, walruscanUrl, type Network } from "@/lib/links";
 
 // ── who is looking ──────────────────────────────────────────────────────────
 
 /** The signed-in viewer, if any: decides whether a card offers "This worked for me". */
 const ViewerContext = createContext<{ handle?: string }>({});
 export const ViewerProvider = ViewerContext.Provider;
-
-export function profileHref(handle: string): string {
-  return `/u/${encodeURIComponent(handle.replace(/^@+/, ""))}`;
-}
 
 /** A member handle that opens their profile. */
 export function Handle({ handle, className = "" }: { handle: string; className?: string }) {

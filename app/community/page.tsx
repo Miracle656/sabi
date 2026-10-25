@@ -7,7 +7,8 @@ import { communityIndex } from "@/lib/community";
 import { defaultNamespace, mode, network } from "@/lib/memwal";
 import { LEVELS, POINTS } from "@/lib/reputation";
 import { SESSION_COOKIE, openSession } from "@/lib/session";
-import { FindingCard, ViewerProvider, profileHref } from "@/components/memory-card";
+import { FindingCard, ViewerProvider } from "@/components/memory-card";
+import { profileHref } from "@/lib/links";
 import { LevelTag, PageShell } from "@/components/page-shell";
 
 export const dynamic = "force-dynamic";
