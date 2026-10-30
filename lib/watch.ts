@@ -6,6 +6,10 @@
 //   [WATCH] <address> → <label> → SINCE: YYYY-MM-DD
 //   [SNAPSHOT] <address> → <balance> MIST → AT: <ISO time>
 //   [FAILURE] <address> → <failure signature> → TX: <digest> → AT: <ISO time>
+//   [RULE] <escalate|mute|set|clear> → <target> → REASON: <why> → AT: <ISO time>
+//
+// Rules are the member's escalation preferences, learned from what they say
+// and click. The newest rule for a target wins; `clear` removes it.
 //
 // Snapshots are SUI balances read through Tatum. Burn is computed between
 // consecutive snapshots in code; the model never does this arithmetic.
@@ -33,7 +37,34 @@ export interface FailureSeen {
   digest: string;
   at: string;
 }
-export type PersonalLine = Watch | Snapshot | FailureSeen;
+export type RuleAction = "escalate" | "mute" | "set" | "clear";
+export interface Rule {
+  kind: "rule";
+  action: RuleAction;
+  /** kind:<alert kind> | text:<words> | address:<0x..> | spike_ratio=<n> | runway_days=<n> */
+  target: string;
+  reason: string;
+  at: string;
+}
+export type PersonalLine = Watch | Snapshot | FailureSeen | Rule;
+
+export const ALERT_KINDS = ["burn_spike", "low_runway", "new_failure", "repeat_failure"] as const;
+const MATCH_TARGET = /^(kind:(burn_spike|low_runway|new_failure|repeat_failure)|text:[^\n→|]{2,60}|address:0x[0-9a-f]{1,64})$/;
+const SET_TARGET = /^(spike_ratio=\d+(\.\d+)?|runway_days=\d{1,3})$/;
+
+/** Is `target` valid for `action`? Matching rules name what they match; `set` names a threshold. */
+export function validRule(action: RuleAction, target: string): boolean {
+  if (action === "set") return SET_TARGET.test(target);
+  if (action === "clear") return MATCH_TARGET.test(target) || SET_TARGET.test(target);
+  return MATCH_TARGET.test(target);
+}
+
+/** Lower-case the parts of a target that are case-insensitive. */
+export function normalizeTarget(target: string): string {
+  const t = target.trim();
+  if (t.startsWith("text:")) return `text:${t.slice(5).trim().toLowerCase()}`;
+  return t.toLowerCase();
+}
 
 /** One namespace per member: `<community>--u-<handle>`, in characters any namespace accepts. */
 export function personalNamespace(community: string, handle: string): string {
@@ -64,7 +95,22 @@ export function formatFailure(f: Omit<FailureSeen, "kind">): string {
   ].join(SEP);
 }
 
+export function formatRule(r: Omit<Rule, "kind">): string {
+  return [`[RULE] ${r.action}`, normalizeTarget(r.target), `REASON: ${clean(r.reason).slice(0, 160) || "-"}`, `AT: ${r.at}`].join(SEP);
+}
+
+function parseRule(parts: string[]): Rule | null {
+  const action = /^\[RULE\]\s+(escalate|mute|set|clear)$/.exec(parts[0])?.[1] as RuleAction | undefined;
+  if (!action || parts.length !== 4) return null;
+  const target = normalizeTarget(parts[1]);
+  const reason = parts[2].startsWith("REASON:") ? parts[2].slice(7).trim() : null;
+  const at = parts[3].startsWith("AT:") ? parts[3].slice(3).trim() : null;
+  if (!validRule(action, target) || reason === null || !at || Number.isNaN(Date.parse(at))) return null;
+  return { kind: "rule", action, target, reason, at };
+}
+
 export function parsePersonal(text: string): PersonalLine | null {
+  if (text.startsWith("[RULE]")) return parseRule(text.split(SEP).map((p) => p.trim()));
   const head = /^\[(WATCH|SNAPSHOT|FAILURE)\]\s+(\S+)$/.exec(text.split(SEP)[0]?.trim() ?? "");
   if (!head) return null;
   const parts = text.split(SEP).map((p) => p.trim());
@@ -128,6 +174,10 @@ export interface Alert {
   detail: string;
   /** For failure alerts: the failure signature, which is also the recall query. */
   signature?: string;
+  /** Set when one of the member's rules escalated this alert: that rule's target. */
+  escalatedBy?: string;
+  /** Set on a muted alert: the rule that muted it. */
+  mutedBy?: string;
 }
 
 export interface ProjectReport {
@@ -146,7 +196,74 @@ export interface ProjectReport {
   baselinePerDay: bigint | null;
   runwayDays: number | null;
   failures: { signature: string; count: number; lastAt: string; lastDigest: string; recent: number }[];
+  /** Alerts after the member's rules: escalated first. */
   alerts: Alert[];
+  /** Alerts the member's rules muted - counted, never silently dropped. */
+  muted: Alert[];
+  /** Thresholds in force, after any `set` rules. */
+  thresholds: { spikeRatio: number; runwayDays: number };
+}
+
+// ── rules ───────────────────────────────────────────────────────────────────
+
+/** The rules in force: newest per target, `clear` removing a target. */
+export function activeRules(lines: PersonalLine[]): Rule[] {
+  const ordered = lines
+    .filter((l): l is Rule => l.kind === "rule")
+    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  const byTarget = new Map<string, Rule>();
+  for (const r of ordered) {
+    if (r.action === "clear") byTarget.delete(r.target);
+    // A threshold has one slot per name, whatever its value.
+    else if (r.action === "set") {
+      const name = r.target.split("=")[0];
+      for (const k of [...byTarget.keys()]) if (k.startsWith(`${name}=`)) byTarget.delete(k);
+      byTarget.set(r.target, r);
+    } else byTarget.set(r.target, r);
+  }
+  return [...byTarget.values()];
+}
+
+export function thresholdsFrom(rules: Rule[]): { spikeRatio: number; runwayDays: number } {
+  const get = (name: string) => {
+    const r = rules.find((x) => x.action === "set" && x.target.startsWith(`${name}=`));
+    return r ? Number(r.target.split("=")[1]) : null;
+  };
+  const clamp = (v: number | null, lo: number, hi: number, d: number) =>
+    v === null || Number.isNaN(v) ? d : Math.min(hi, Math.max(lo, v));
+  return {
+    spikeRatio: clamp(get("spike_ratio"), 1.2, 20, SPIKE_RATIO),
+    runwayDays: clamp(get("runway_days"), 1, 365, LOW_RUNWAY_DAYS),
+  };
+}
+
+function ruleMatches(r: Rule, a: Alert, address: string): boolean {
+  if (r.target.startsWith("kind:")) return a.kind === r.target.slice(5);
+  if (r.target.startsWith("address:")) return address === r.target.slice(8);
+  if (r.target.startsWith("text:")) {
+    const hay = `${a.title} ${a.detail} ${a.signature ?? ""}`.toLowerCase();
+    return hay.includes(r.target.slice(5));
+  }
+  return false;
+}
+
+/** Escalate beats mute: a member who said "always tell me" is never silenced by a broader mute. */
+export function applyRules(
+  alerts: Alert[],
+  address: string,
+  rules: Rule[],
+): { alerts: Alert[]; muted: Alert[] } {
+  const shown: Alert[] = [];
+  const muted: Alert[] = [];
+  for (const a of alerts) {
+    const up = rules.find((r) => r.action === "escalate" && ruleMatches(r, a, address));
+    const down = rules.find((r) => r.action === "mute" && ruleMatches(r, a, address));
+    if (up) shown.push({ ...a, severity: "bad", escalatedBy: up.target });
+    else if (down) muted.push({ ...a, mutedBy: down.target });
+    else shown.push(a);
+  }
+  shown.sort((x, y) => Number(Boolean(y.escalatedBy)) - Number(Boolean(x.escalatedBy)));
+  return { alerts: shown, muted };
 }
 
 function median(xs: bigint[]): bigint | null {
@@ -187,8 +304,10 @@ export function analyzeProject(
   watch: Watch,
   lines: PersonalLine[],
   now: Date,
+  rules: Rule[] = activeRules(lines),
 ): ProjectReport {
-  const mine = lines.filter((l) => l.address === watch.address);
+  const thresholds = thresholdsFrom(rules);
+  const mine = lines.filter((l) => l.kind !== "rule" && l.address === watch.address);
   const snaps = mine.filter((l): l is Snapshot => l.kind === "snapshot");
   const fails = mine.filter((l): l is FailureSeen => l.kind === "failure");
   const latest = [...snaps].sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0];
@@ -225,7 +344,7 @@ export function analyzeProject(
   const alerts: Alert[] = [];
   if (latestPerDay !== null && baselinePerDay && baselinePerDay > 0n && latestPerDay >= MIN_ALERT_BURN) {
     const ratio = Number((latestPerDay * 100n) / baselinePerDay) / 100;
-    if (ratio >= SPIKE_RATIO) {
+    if (ratio >= thresholds.spikeRatio) {
       alerts.push({
         kind: "burn_spike",
         severity: ratio >= 4 ? "bad" : "warn",
@@ -234,7 +353,7 @@ export function analyzeProject(
       });
     }
   }
-  if (runwayDays !== null && runwayDays < LOW_RUNWAY_DAYS) {
+  if (runwayDays !== null && runwayDays < thresholds.runwayDays) {
     alerts.push({
       kind: "low_runway",
       severity: runwayDays < 3 ? "bad" : "warn",
@@ -278,6 +397,7 @@ export function analyzeProject(
     baselinePerDay,
     runwayDays,
     failures,
-    alerts,
+    ...applyRules(alerts, watch.address, rules),
+    thresholds,
   };
 }

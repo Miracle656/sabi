@@ -2,14 +2,18 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  activeRules,
   analyzeProject,
   burnIntervals,
   formatFailure,
+  formatRule,
   formatSnapshot,
   formatWatch,
   jsonSafe,
   parsePersonal,
   personalNamespace,
+  thresholdsFrom,
+  validRule,
   type PersonalLine,
   type Watch,
 } from "./watch";
@@ -90,4 +94,67 @@ test("reports serialize despite BigInt balances", () => {
   const r = analyzeProject(watch, [snap(20, 100), snap(21, 99)], new Date("2026-10-21T12:00:00Z"));
   const safe = jsonSafe(r) as { balanceMist: string };
   assert.equal(safe.balanceMist, "99000000000");
+});
+
+// ── rules ───────────────────────────────────────────────────────────────────
+
+const rule = (action: "escalate" | "mute" | "set" | "clear", target: string, at: string): PersonalLine => ({
+  kind: "rule",
+  action,
+  target,
+  reason: "test",
+  at: `2026-10-${at}T06:00:00.000Z`,
+});
+
+test("rule lines round-trip; invalid targets are refused", () => {
+  const line = formatRule({ action: "escalate", target: "text:Enoki", reason: "we use zkLogin", at: "2026-10-30T06:00:00.000Z" });
+  assert.match(line, /^\[RULE\] escalate → text:enoki → REASON: we use zkLogin → AT: /);
+  assert.deepEqual(parsePersonal(line), {
+    kind: "rule",
+    action: "escalate",
+    target: "text:enoki",
+    reason: "we use zkLogin",
+    at: "2026-10-30T06:00:00.000Z",
+  });
+  assert.equal(validRule("set", "spike_ratio=3"), true);
+  assert.equal(validRule("set", "text:enoki"), false);
+  assert.equal(validRule("mute", "kind:everything"), false);
+  assert.equal(parsePersonal("[RULE] mute → kind:nope → REASON: x → AT: 2026-10-30T06:00:00Z"), null);
+});
+
+test("newest rule per target wins; clear removes; thresholds keep one slot", () => {
+  const rules = activeRules([
+    rule("mute", "kind:new_failure", "20"),
+    rule("escalate", "kind:new_failure", "21"),
+    rule("mute", "text:rate limit", "22"),
+    rule("clear", "text:rate limit", "23"),
+    rule("set", "spike_ratio=3", "24"),
+    rule("set", "spike_ratio=5", "25"),
+  ]);
+  assert.deepEqual(
+    rules.map((r) => `${r.action} ${r.target}`).sort(),
+    ["escalate kind:new_failure", "set spike_ratio=5"],
+  );
+  assert.deepEqual(thresholdsFrom(rules), { spikeRatio: 5, runwayDays: 14 });
+});
+
+test("rules reshape alerts: thresholds, escalate beats mute, muted is counted", () => {
+  const lines = [snap(20, 100), snap(21, 99), snap(22, 98), snap(23, 97), snap(24, 94)]; // 3x spike
+  const now = new Date("2026-10-24T12:00:00Z");
+  assert.equal(analyzeProject(watch, lines, now).alerts[0].kind, "burn_spike");
+  // Raising the threshold to 4x silences a 3x spike.
+  const raised = analyzeProject(watch, [...lines, rule("set", "spike_ratio=4", "24")], now);
+  assert.equal(raised.alerts.length, 0);
+  assert.equal(raised.thresholds.spikeRatio, 4);
+  // Mute the kind, but escalate the address: escalate wins.
+  const both = analyzeProject(
+    watch,
+    [...lines, rule("mute", "kind:burn_spike", "24"), rule("escalate", `address:${ADDR}`, "24")],
+    now,
+  );
+  assert.equal(both.alerts[0].escalatedBy, `address:${ADDR}`);
+  assert.equal(both.alerts[0].severity, "bad");
+  const muted = analyzeProject(watch, [...lines, rule("mute", "kind:burn_spike", "24")], now);
+  assert.equal(muted.alerts.length, 0);
+  assert.equal(muted.muted[0].mutedBy, "kind:burn_spike");
 });

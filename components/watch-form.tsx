@@ -69,3 +69,53 @@ export function WatchForm({ compact = false }: { compact?: boolean }) {
     </form>
   );
 }
+
+/**
+ * One click = one rule in the member's memory. Escalate / Mute on an alert,
+ * Remove on a rule: the same rules the chat learns from conversation.
+ */
+export function RuleButton({
+  action,
+  target,
+  reason,
+  children,
+  tone = "plain",
+}: {
+  action: "escalate" | "mute" | "set" | "clear";
+  target: string;
+  reason: string;
+  children: React.ReactNode;
+  tone?: "plain" | "strong";
+}) {
+  const router = useRouter();
+  const [state, setState] = useState<"idle" | "working" | "error">("idle");
+  const click = async () => {
+    setState("working");
+    try {
+      const res = await fetch("/api/watch/rules", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action, target, reason }),
+      });
+      const j = (await res.json()) as { status: string };
+      if (j.status === "error") return setState("error");
+      setState("idle");
+      router.refresh();
+    } catch {
+      setState("error");
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={click}
+      disabled={state === "working"}
+      title={`Remember: ${action} ${target}`}
+      className={`rounded-full border px-2.5 py-0.5 text-[12px] transition-colors disabled:opacity-60 ${
+        tone === "strong" ? "border-current" : "border-line2 text-muted hover:border-ink hover:text-ink"
+      }`}
+    >
+      {state === "working" ? "Saving…" : state === "error" ? "Failed, retry" : children}
+    </button>
+  );
+}

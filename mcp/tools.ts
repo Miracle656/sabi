@@ -10,8 +10,8 @@ import { getEnv } from "../lib/env";
 import { buildSystemPrompt } from "../lib/sabi-prompt";
 import { todayISO } from "../lib/findings";
 import { defaultNamespace, mode, searchFindings } from "../lib/memwal";
-import { InspectInputSchema, WatchInputSchema, inspectAction } from "../lib/diagnose";
-import { addWatch, projectStatus, statusForModel } from "../lib/watchdog";
+import { InspectInputSchema, RuleInputSchema, WatchInputSchema, inspectAction } from "../lib/diagnose";
+import { addRule, addWatch, projectStatus, statusForModel } from "../lib/watchdog";
 import {
   ConfirmInputSchema,
   RememberInputSchema,
@@ -107,6 +107,24 @@ export function registerSabi(server: McpServer): void {
     async ({ address, label }) => {
       try {
         const res = await addWatch(getEnv().reporter, address, label ?? "");
+        return res.status === "error" ? failure(res.error) : text(res);
+      } catch (err) {
+        return failure(describe(err));
+      }
+    },
+  );
+
+  server.registerTool(
+    "set_escalation_rule",
+    {
+      title: "Remember an alert preference",
+      description:
+        "Remember how project alerts should be handled: escalate (always flag), mute (stop flagging), set a threshold, or clear a rule. Call whenever the user says what they care about or don't, or corrects an alert. The newest rule for a target replaces the old one.",
+      inputSchema: RuleInputSchema.shape,
+    },
+    async ({ action, target, reason }) => {
+      try {
+        const res = await addRule(getEnv().reporter, action, target, reason);
         return res.status === "error" ? failure(res.error) : text(res);
       } catch (err) {
         return failure(describe(err));

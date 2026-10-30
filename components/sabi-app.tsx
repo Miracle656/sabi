@@ -54,7 +54,8 @@ const CONFIRM = "tool-confirm_finding";
 const INSPECT = "tool-inspect_transaction";
 const WATCH = "tool-watch_address";
 const STATUS = "tool-project_status";
-const TOOL_TYPES = new Set([RECALL, STORE, CONFIRM, INSPECT, WATCH, STATUS]);
+const RULE = "tool-set_escalation_rule";
+const TOOL_TYPES = new Set([RECALL, STORE, CONFIRM, INSPECT, WATCH, STATUS, RULE]);
 
 function isToolPart(p: { type: string }): p is ToolPart {
   return TOOL_TYPES.has(p.type);
@@ -601,7 +602,9 @@ function ToolPartView({
     }
     return (
       <ActivityRow spinner>
-        {part.type === WATCH
+        {part.type === RULE
+          ? "Remembering your rule…"
+          : part.type === WATCH
           ? "Reading the balance from Sui and remembering it…"
           : part.type === STATUS
           ? "Reading your project memory…"
@@ -628,6 +631,29 @@ function ToolPartView({
           Watching <span className="text-ink">{out.watch?.label}</span> · balance remembered on Walrus ·{" "}
           <a href="/watch" className="underline decoration-line2 underline-offset-2 hover:text-ink">
             Your project
+          </a>
+        </span>
+      </ActivityRow>
+    );
+  }
+
+  if (part.type === RULE) {
+    const out = part.output as {
+      status: string;
+      error?: string;
+      rule?: { action: string; target: string };
+      replaced?: { action: string; target: string };
+    };
+    return out.status === "error" ? (
+      <ActivityRow tone="bad">{out.error}</ActivityRow>
+    ) : (
+      <ActivityRow tone="ok">
+        <span>
+          Rule remembered: <span className="text-ink">{out.rule?.action}</span>{" "}
+          <span className="mono text-ink">{out.rule?.target}</span>
+          {out.replaced && <> (replaces {out.replaced.action})</>} ·{" "}
+          <a href="/watch" className="underline decoration-line2 underline-offset-2 hover:text-ink">
+            your rules
           </a>
         </span>
       </ActivityRow>
@@ -1018,10 +1044,14 @@ function LedgerItem({
         {isRecall ? "recalling…" : part.type === INSPECT ? "reading Sui…" : "storing…"}
       </span>
     );
-  } else if (part.type === WATCH || part.type === STATUS) {
+  } else if (part.type === WATCH || part.type === STATUS || part.type === RULE) {
     body = (
       <a href="/watch" className="text-faint underline decoration-line2 underline-offset-2 hover:text-ink">
-        {part.type === WATCH ? "address added to your project" : "project memory read"}
+        {part.type === WATCH
+          ? "address added to your project"
+          : part.type === RULE
+            ? "rule added to your project"
+            : "project memory read"}
       </a>
     );
   } else if (part.type === INSPECT) {
@@ -1094,6 +1124,8 @@ function LedgerItem({
               ? "Chain read"
               : part.type === WATCH
                 ? "Watch"
+                : part.type === RULE
+                  ? "Rule"
                 : part.type === STATUS
                   ? "Project"
                   : part.type === CONFIRM

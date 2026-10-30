@@ -7,8 +7,14 @@ import { isAddress, mistToSui, type TxReport } from "./onchain";
 import { suiBalance, tatumEnabled } from "./tatum";
 import { todayISO, type RecalledFinding } from "./findings";
 import {
+  activeRules,
   analyzeProject,
   formatFailure,
+  formatRule,
+  normalizeTarget,
+  validRule,
+  type Rule,
+  type RuleAction,
   formatSnapshot,
   formatWatch,
   normalizeAddress,
@@ -25,18 +31,19 @@ const SNAPSHOT_EVERY_MS = 6 * 3_600_000;
 const WRITE_WAIT_MS = 8_000;
 const MAX_WATCHES = 5;
 const PERSONAL_QUERY = "WATCH SNAPSHOT FAILURE address balance MIST transaction";
-const WATCH_QUERY = "[WATCH] address label SINCE";
+// Registrations and rules are the OLDEST lines a member has; they get their own lookup.
+const STANDING_QUERY = "[WATCH] [RULE] address label SINCE escalate mute set clear REASON";
 
 export function memberNamespace(handle: string): string {
   return personalNamespace(getEnv().namespace, handle);
 }
 
 async function readLines(ns: string): Promise<PersonalLine[]> {
-  // Newest-first returns the latest 100 lines, and registrations are the OLDEST
-  // lines - so watches get their own lookup and cannot age out of view.
+  // Newest-first returns the latest 100 lines, and registrations and rules are
+  // the OLDEST lines - so they get their own lookup and cannot age out of view.
   const [recent, watches] = await Promise.all([
     recallLines(ns, PERSONAL_QUERY, 100),
-    recallLines(ns, WATCH_QUERY, 20),
+    recallLines(ns, STANDING_QUERY, 60),
   ]);
   const seen = new Set<string>();
   const out: PersonalLine[] = [];
@@ -119,6 +126,44 @@ export interface ProjectStatus {
   namespace: string;
   projects: (ProjectReport & { fixes: Record<string, RecalledFinding[]> })[];
   memories: number;
+  rules: Rule[];
+  /** Recent community findings matching the member's escalate text rules. */
+  communityWatch: { target: string; findings: RecalledFinding[] }[];
+}
+
+/** Community findings this recent count as news for an escalate rule. */
+const NEWS_DAYS = 30;
+
+export type RuleResult = { status: "ok"; rule: Rule; replaced?: Rule } | { status: "error"; error: string };
+
+/**
+ * Remember an escalation preference. The newest rule for a target wins, so a
+ * correction ("actually, do tell me about that") is just another rule.
+ */
+export async function addRule(
+  handle: string,
+  action: RuleAction,
+  rawTarget: string,
+  reason: string,
+): Promise<RuleResult> {
+  const target = normalizeTarget(rawTarget);
+  if (!validRule(action, target)) {
+    return {
+      status: "error",
+      error:
+        action === "set"
+          ? "A threshold rule is spike_ratio=<number> or runway_days=<days>."
+          : "A rule matches kind:<burn_spike|low_runway|new_failure|repeat_failure>, text:<words> or address:<0x..>.",
+    };
+  }
+  const ns = memberNamespace(handle);
+  const before = activeRules(await readLines(ns));
+  const replaced = before.find(
+    (r) => r.target === target || (action === "set" && r.target.split("=")[0] === target.split("=")[0]),
+  );
+  const rule: Rule = { kind: "rule", action, target, reason: reason.trim(), at: new Date().toISOString() };
+  await append(ns, formatRule(rule));
+  return { status: "ok", rule, ...(replaced ? { replaced } : {}) };
 }
 
 /** Everything the "Your project" page and the project_status tool show. */
@@ -134,9 +179,10 @@ export async function projectStatus(handle: string, opts: { refresh?: boolean } 
     }
   }
   const today = todayISO(now);
+  const rules = activeRules(lines);
   const projects = await Promise.all(
     watchesOf(lines).map(async (w) => {
-      const report = analyzeProject(w, lines, now);
+      const report = analyzeProject(w, lines, now, rules);
       // The community's verified fix for each failure this project hit.
       const fixes: Record<string, RecalledFinding[]> = {};
       for (const f of report.failures.slice(0, 4)) {
@@ -149,7 +195,26 @@ export async function projectStatus(handle: string, opts: { refresh?: boolean } 
       return { ...report, fixes };
     }),
   );
-  return { namespace: ns, projects, memories: lines.length };
+  // "Always flag enoki" also means: tell me when the community verifies
+  // something new about enoki.
+  const communityWatch = await Promise.all(
+    rules
+      .filter((r) => r.action === "escalate" && r.target.startsWith("text:"))
+      .slice(0, 5)
+      .map(async (r) => {
+        try {
+          const { active } = await searchFindings(r.target.slice(5), { limit: 4, today });
+          const fresh = active.filter((h) => {
+            const d = h.last_verified ?? h.finding?.verifiedOn;
+            return d && Date.parse(today) - Date.parse(d) <= NEWS_DAYS * 86_400_000;
+          });
+          return { target: r.target, findings: fresh.slice(0, 3) };
+        } catch {
+          return { target: r.target, findings: [] };
+        }
+      }),
+  );
+  return { namespace: ns, projects, memories: lines.length, rules, communityWatch };
 }
 
 /** The daily cron: refresh every member's watched balances. */
@@ -173,6 +238,16 @@ export function statusForModel(s: ProjectStatus) {
   const sui = (v: bigint | null) => (v === null ? null : mistToSui(v));
   return {
     memories: s.memories,
+    rules: s.rules.map((r) => ({ action: r.action, target: r.target, reason: r.reason, since: r.at })),
+    community_watch: s.communityWatch.map((w) => ({
+      rule: w.target,
+      new_findings: w.findings.map((h) => ({
+        memory_id: h.memory_id,
+        subject: h.finding?.subject,
+        fix: h.finding?.fix,
+        by: h.finding?.reportedBy,
+      })),
+    })),
     projects: s.projects.map((p) => ({
       label: p.label,
       address: p.address,
@@ -183,7 +258,9 @@ export function statusForModel(s: ProjectStatus) {
       burn_sui_per_day_latest: sui(p.latestPerDay),
       burn_sui_per_day_baseline: sui(p.baselinePerDay),
       runway_days: p.runwayDays,
+      thresholds: p.thresholds,
       alerts: p.alerts,
+      muted_alerts: p.muted.length,
       failures: p.failures.map((f) => ({
         ...f,
         community_fixes: (p.fixes[f.signature] ?? []).map((h) => ({

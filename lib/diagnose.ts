@@ -41,6 +41,23 @@ export const WatchInputSchema = z.object({
   label: z.string().trim().max(60).optional().describe("A short name for it, e.g. 'mainnet deployer'."),
 });
 
+export const RuleInputSchema = z.object({
+  action: z
+    .enum(["escalate", "mute", "set", "clear"])
+    .describe("escalate = always flag; mute = stop flagging; set = change a threshold; clear = remove the rule on that target."),
+  target: z
+    .string()
+    .trim()
+    .describe(
+      "What the rule matches: kind:burn_spike | kind:low_runway | kind:new_failure | kind:repeat_failure | text:<words, e.g. enoki or MoveAbort 101> | address:<0x..>. For set: spike_ratio=<n> or runway_days=<days>.",
+    ),
+  reason: z
+    .string()
+    .trim()
+    .max(160)
+    .describe("The user's own words for why, e.g. 'rate limits are expected on our free RPC'."),
+});
+
 /**
  * `member`: the signed-in handle. When the transaction failed from one of
  * their watched addresses, the failure is remembered for their watchdog.

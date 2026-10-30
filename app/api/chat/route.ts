@@ -20,8 +20,8 @@ import { DEFAULT_MODEL_ID, isClaudeModel, modelIds } from "@/lib/models";
 import { buildSystemPrompt } from "@/lib/sabi-prompt";
 import { todayISO } from "@/lib/findings";
 import { searchFindings } from "@/lib/memwal";
-import { InspectInputSchema, WatchInputSchema, inspectAction } from "@/lib/diagnose";
-import { addWatch, projectStatus, statusForModel } from "@/lib/watchdog";
+import { InspectInputSchema, RuleInputSchema, WatchInputSchema, inspectAction } from "@/lib/diagnose";
+import { addRule, addWatch, projectStatus, statusForModel } from "@/lib/watchdog";
 import {
   ConfirmInputSchema,
   RememberInputSchema,
@@ -146,6 +146,18 @@ export async function POST(req: Request) {
               error: err instanceof Error ? err.message : String(err),
             }))
           : { status: "error" as const, error: "Refused: watching is personal memory, so the user must sign in first." },
+    }),
+    set_escalation_rule: tool({
+      description:
+        "Remember how the signed-in user wants their project alerts handled: escalate (always flag), mute (stop flagging), set a threshold, or clear a rule. Call whenever the user says what they care about or don't ('always tell me about enoki', 'stop flagging rate limits', 'only warn me at 3x spend'), or corrects an alert. The newest rule for a target replaces the old one.",
+      inputSchema: RuleInputSchema,
+      execute: async ({ action, target, reason }) =>
+        session
+          ? addRule(session.handle, action, target, reason).catch((err: unknown) => ({
+              status: "error" as const,
+              error: err instanceof Error ? err.message : String(err),
+            }))
+          : { status: "error" as const, error: "Refused: rules are personal memory, so the user must sign in first." },
     }),
     project_status: tool({
       description:

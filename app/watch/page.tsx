@@ -6,11 +6,11 @@ import { projectStatus, type ProjectStatus } from "@/lib/watchdog";
 import { mode, network } from "@/lib/memwal";
 import { mistToSui, shortId, suiscanAccount, suiscanTx } from "@/lib/onchain";
 import { tatumEnabled } from "@/lib/tatum";
-import { LOW_RUNWAY_DAYS, SPIKE_RATIO, type Alert } from "@/lib/watch";
+import { type Alert, type Rule } from "@/lib/watch";
 import { viewer } from "@/lib/viewer";
 import { FindingCard, ViewerProvider } from "@/components/memory-card";
 import { PageShell } from "@/components/page-shell";
-import { WatchForm } from "@/components/watch-form";
+import { RuleButton, WatchForm } from "@/components/watch-form";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -63,6 +63,28 @@ export default async function WatchPage() {
         <section className="mt-7 max-w-[760px]">
           <WatchForm />
         </section>
+
+        <RulesPanel rules={status.rules} />
+
+        {status.communityWatch.some((w) => w.findings.length > 0) && (
+          <section aria-label="Watching the community for you" className="mt-8 flex flex-col gap-3">
+            <h2 className="border-b border-line pb-2 text-[13px] font-medium">
+              Watching the community for you · verified in the last 30 days
+            </h2>
+            {status.communityWatch
+              .filter((w) => w.findings.length > 0)
+              .map((w) => (
+                <div key={w.target} className="flex flex-col gap-2">
+                  <span className="text-[12.5px] text-muted">
+                    Because you escalate <span className="mono text-ink">{w.target.slice(5)}</span>
+                  </span>
+                  {w.findings.map((h) => (
+                    <FindingCard key={h.memory_id} hit={h} network={net} mock={mock} />
+                  ))}
+                </div>
+              ))}
+          </section>
+        )}
 
         {status.projects.length === 0 && (
           <p className="mt-8 max-w-[62ch] text-[14px] leading-relaxed text-faint">
@@ -127,7 +149,7 @@ function ProjectView({ p, net, mock }: { p: Project; net: "mainnet" | "testnet";
         <Stat
           label="gas runway"
           value={p.runwayDays === null ? "–" : p.runwayDays > 999 ? "999+ days" : `${Math.floor(p.runwayDays)} days`}
-          tone={p.runwayDays !== null && p.runwayDays < LOW_RUNWAY_DAYS ? "warn" : undefined}
+          tone={p.runwayDays !== null && p.runwayDays < p.thresholds.runwayDays ? "warn" : undefined}
         />
       </dl>
 
@@ -138,11 +160,29 @@ function ProjectView({ p, net, mock }: { p: Project; net: "mainnet" | "testnet";
           <h3 className="border-b border-line pb-2 text-[13px] font-medium">Alerts</h3>
           {p.alerts.length === 0 ? (
             <p className="text-[13px] text-faint">
-              Nothing unusual. Sabi flags spend above {SPIKE_RATIO}× your normal, under {LOW_RUNWAY_DAYS} days of
-              gas, and new or repeating failures.
+              Nothing unusual. Sabi flags spend above {p.thresholds.spikeRatio}× your normal, under{" "}
+              {p.thresholds.runwayDays} days of gas, and new or repeating failures.
             </p>
           ) : (
             p.alerts.map((a, i) => <AlertRow key={i} a={a} />)
+          )}
+          {p.muted.length > 0 && (
+            <details className="text-[12.5px] text-faint">
+              <summary className="cursor-pointer list-none hover:text-muted">
+                {p.muted.length} muted by your rules
+              </summary>
+              <ul className="mt-2 flex flex-col gap-2">
+                {p.muted.map((a, i) => (
+                  <li key={i} className="flex flex-wrap items-center gap-2">
+                    <span className="text-muted">{a.title}</span>
+                    <span className="mono">({a.mutedBy})</span>
+                    <RuleButton action="clear" target={a.mutedBy!} reason="unmuted from the project page">
+                      Unmute
+                    </RuleButton>
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
 
           <h3 className="mt-4 border-b border-line pb-2 text-[13px] font-medium">What Sabi has learned</h3>
@@ -205,23 +245,91 @@ function Stat({ label, value, hint, tone }: { label: string; value: string; hint
   );
 }
 
+/** The narrowest rule target for an alert: its exact failure, else its kind. */
+function targetFor(a: Alert): string {
+  return a.signature ? `text:${a.signature.slice(0, 60).toLowerCase()}` : `kind:${a.kind}`;
+}
+
+const KIND_LABEL: Record<string, string> = {
+  burn_spike: "spend spikes",
+  low_runway: "low gas runway",
+  new_failure: "new failure types",
+  repeat_failure: "repeating failures",
+};
+
 function AlertRow({ a }: { a: Alert }) {
   const bad = a.severity === "bad";
+  const target = targetFor(a);
   return (
     <div
-      className={`flex flex-col gap-1 rounded-[var(--r)] px-3.5 py-2.5 text-[13px] ${bad ? "bg-bad-soft text-bad" : "bg-warn-soft text-warn"}`}
+      className={`flex flex-col gap-1.5 rounded-[var(--r)] px-3.5 py-2.5 text-[13px] ${bad ? "bg-bad-soft text-bad" : "bg-warn-soft text-warn"}`}
     >
-      <span className="font-medium">{a.title}</span>
+      <span className="font-medium">
+        {a.escalatedBy && <span className="eyebrow mr-2">Escalated</span>}
+        {a.title}
+      </span>
       <span className="[overflow-wrap:anywhere]">{a.detail}</span>
-      {a.signature && (
-        <a
-          href={`/community?q=${encodeURIComponent(a.signature)}`}
-          className="w-fit underline underline-offset-2"
-        >
-          Search community findings
-        </a>
-      )}
+      <div className="flex flex-wrap items-center gap-2 pt-0.5">
+        {a.signature && (
+          <a href={`/community?q=${encodeURIComponent(a.signature)}`} className="mr-1 underline underline-offset-2">
+            Community findings
+          </a>
+        )}
+        {a.escalatedBy ? (
+          <>
+            <span className="mono text-[11.5px]">your rule: {a.escalatedBy}</span>
+            <RuleButton action="clear" target={a.escalatedBy} reason="removed from the project page">
+              Remove rule
+            </RuleButton>
+          </>
+        ) : (
+          <>
+            <RuleButton action="escalate" target={target} reason="escalated from the project page">
+              Always escalate
+            </RuleButton>
+            <RuleButton action="mute" target={target} reason="muted from the project page">
+              Mute {a.signature ? "this failure" : KIND_LABEL[a.kind]}
+            </RuleButton>
+          </>
+        )}
+      </div>
     </div>
+  );
+}
+
+const ACTION_LABEL: Record<string, string> = { escalate: "Escalate", mute: "Mute", set: "Threshold" };
+
+/** What the member has taught the watchdog, newest last, each removable. */
+function RulesPanel({ rules }: { rules: Rule[] }) {
+  return (
+    <section aria-label="Your rules" className="mt-8 max-w-[760px]">
+      <h2 className="border-b border-line pb-2 text-[13px] font-medium">Your rules</h2>
+      {rules.length === 0 ? (
+        <p className="pt-3 text-[13px] leading-relaxed text-faint">
+          None yet. Tell Sabi in chat what matters (&ldquo;always flag anything about enoki&rdquo;, &ldquo;rate limits
+          are normal for us&rdquo;, &ldquo;only warn me at 3x spend&rdquo;), or use Escalate and Mute on an alert. Each
+          rule is a memory on Walrus, so it follows you to any AI tool over MCP.
+        </p>
+      ) : (
+        <ul className="flex flex-col">
+          {rules.map((r) => (
+            <li key={r.target} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line py-2.5 text-[13px]">
+              <span
+                className={`eyebrow w-[78px] ${r.action === "escalate" ? "text-bad" : r.action === "mute" ? "text-faint" : "text-muted"}`}
+              >
+                {ACTION_LABEL[r.action]}
+              </span>
+              <span className="mono text-ink [overflow-wrap:anywhere]">{r.target}</span>
+              <span className="min-w-0 flex-1 text-muted [overflow-wrap:anywhere]">{r.reason !== "-" ? `“${r.reason}”` : ""}</span>
+              <span className="nums text-[11.5px] text-faint">{r.at.slice(0, 10)}</span>
+              <RuleButton action="clear" target={r.target} reason="removed from the project page">
+                Remove
+              </RuleButton>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
