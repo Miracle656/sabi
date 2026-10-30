@@ -6,6 +6,7 @@ import { communityIndex } from "@/lib/community";
 import { mode, network } from "@/lib/memwal";
 import { LEVELS, findContributor, levelRank } from "@/lib/reputation";
 import { viewer } from "@/lib/viewer";
+import { suiscanAccount } from "@/lib/onchain";
 import { Identicon } from "@/components/identicon";
 import { FindingCard, ViewerProvider } from "@/components/memory-card";
 import { LevelTag, PageShell } from "@/components/page-shell";
@@ -63,6 +64,17 @@ export default async function ProfilePage(props: { params: Promise<{ handle: str
               </h1>
               <div className="flex items-center gap-2.5">
                 <LevelTag name={level.name} title={level.rule} />
+                {(me?.packages ?? 0) > 0 && me?.address && (
+                  <a
+                    href={suiscanAccount(me.address)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[12px] text-ok underline decoration-line2 underline-offset-2"
+                    title="Read through Tatum: UpgradeCaps held by this member's zkLogin address"
+                  >
+                    Sui builder · {me.packages} published {me.packages === 1 ? "package" : "packages"} ↗
+                  </a>
+                )}
                 {rank && <span className="nums text-[12px] text-faint">#{rank} of {index.contributors.length}</span>}
               </div>
             </div>

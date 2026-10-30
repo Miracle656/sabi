@@ -4,6 +4,7 @@
 
 import { z } from "zod";
 import { searchFindings } from "./memwal";
+import { withTrust } from "./community";
 import { findDigest, mistToSui, suiscanTx, type TxReport } from "./onchain";
 import { inspectTransaction, tatumEnabled } from "./tatum";
 import { recordFailure } from "./watchdog";
@@ -83,7 +84,7 @@ export async function inspectAction(
     // this abort will name the code and the function.
     const modules = [...new Set(tx.calls.map((c) => c.split("::").slice(1).join("::")))].slice(0, 4);
     const query = [tx.signature, ...modules].join(" ");
-    const recalled = await searchFindings(query, { limit: 5, today });
+    const recalled = withTrust(await searchFindings(query, { limit: 5, today }));
     let recorded = false;
     if (member) {
       try {

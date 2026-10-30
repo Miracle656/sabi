@@ -20,6 +20,7 @@ import { DEFAULT_MODEL_ID, isClaudeModel, modelIds } from "@/lib/models";
 import { buildSystemPrompt } from "@/lib/sabi-prompt";
 import { todayISO } from "@/lib/findings";
 import { searchFindings } from "@/lib/memwal";
+import { withTrust } from "@/lib/community";
 import { InspectInputSchema, RuleInputSchema, WatchInputSchema, inspectAction } from "@/lib/diagnose";
 import { addRule, addWatch, projectStatus, statusForModel } from "@/lib/watchdog";
 import {
@@ -113,7 +114,7 @@ export async function POST(req: Request) {
       }),
       execute: async ({ query, limit }) => {
         try {
-          const res = await searchFindings(query, { limit, today });
+          const res = withTrust(await searchFindings(query, { limit, today }));
           return {
             query,
             today,
@@ -177,7 +178,7 @@ export async function POST(req: Request) {
         "Store ONE verified, reproducible finding as a durable memory on Walrus. Only after the user confirms they reproduced the issue or the fix themselves. Run recall_findings on the subject first; if an active memory contradicts this one, pass its memory_id as supersedes_memory_id (storage is append-only - nothing is deleted). If an active memory already says the same thing, use confirm_finding instead.",
       // Attribution is NOT model-controlled: the reporter comes from the session.
       inputSchema: RememberInputSchema,
-      execute: (input) => rememberAction(input, { reporter, today }),
+      execute: (input) => rememberAction(input, { reporter, today, address: session?.address }),
     }),
     confirm_finding: tool({
       description:
@@ -187,7 +188,7 @@ export async function POST(req: Request) {
         // An anonymous confirmation would carry the operator's name, which says
         // nothing about who reproduced it.
         session
-          ? confirmAction(input, { reporter, today })
+          ? confirmAction(input, { reporter, today, address: session.address })
           : {
               status: "error" as const,
               error: "Refused: confirmations carry the confirmer's name, so the user must sign in first.",

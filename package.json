@@ -9,7 +9,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test lib/findings.test.ts lib/reputation.test.ts lib/onchain.test.ts lib/watch.test.ts lib/theme.test.ts lib/session.test.ts lib/google-jwt.test.ts && tsx scripts/check-prompt.ts",
+    "test": "tsx --test lib/findings.test.ts lib/reputation.test.ts lib/onchain.test.ts lib/watch.test.ts lib/trust.test.ts lib/theme.test.ts lib/session.test.ts lib/google-jwt.test.ts && tsx scripts/check-prompt.ts",
     "check-prompt": "tsx scripts/check-prompt.ts",
     "seed": "tsx scripts/seed.ts",
     "smoke": "tsx scripts/smoke.ts",

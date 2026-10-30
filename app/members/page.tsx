@@ -117,7 +117,12 @@ export default async function MembersPage(props: { searchParams: Search }) {
                 >
                   {c.handle}
                 </a>
-                <span className="text-[12px] text-muted">{c.level.name}</span>
+                <span className="text-[12px] text-muted">
+                  {c.level.name}
+                  {(c.packages ?? 0) > 0 && (
+                    <span className="text-ok"> · Sui builder, {c.packages} {c.packages === 1 ? "package" : "packages"}</span>
+                  )}
+                </span>
                 <span className="nums text-[13px] font-medium">
                   {c.points} <span className="font-normal text-faint">points</span>
                 </span>

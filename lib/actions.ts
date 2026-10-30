@@ -45,6 +45,8 @@ export type ConfirmInput = z.infer<typeof ConfirmInputSchema>;
 export interface WriteContext {
   reporter: string;
   today: string;
+  /** The signed-in member's zkLogin address; absent for anonymous and MCP writes. */
+  address?: string;
 }
 
 export type WriteResult =
@@ -67,7 +69,7 @@ export async function rememberAction(input: RememberInput, ctx: WriteContext): P
   if (secret) {
     return fail(`Refused: the finding looks like it contains a secret (${secret}). Strip it and try again.`);
   }
-  const finding = toFinding(input, { today: ctx.today, defaultReporter: ctx.reporter });
+  const finding = toFinding(input, { today: ctx.today, defaultReporter: ctx.reporter, address: ctx.address });
   try {
     if (finding.supersedes) {
       const refusal = await checkSupersede(finding, ctx);
@@ -142,6 +144,7 @@ export async function confirmAction(input: ConfirmInput, ctx: WriteContext): Pro
     const finding = toConfirmation(target.finding, target.memory_id, {
       reporter: ctx.reporter,
       today: ctx.today,
+      address: ctx.address,
     });
     const text = formatFinding(finding);
     // Same member, same finding, same day: one confirmation however often it is clicked.

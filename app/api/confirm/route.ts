@@ -27,6 +27,10 @@ export async function POST(req: Request) {
   if (!input.success) {
     return Response.json({ status: "error", error: "memory_id and subject are required" }, { status: 400 });
   }
-  const res = await confirmAction(input.data, { reporter: session.handle, today: todayISO() });
+  const res = await confirmAction(input.data, {
+    reporter: session.handle,
+    today: todayISO(),
+    address: session.address,
+  });
   return Response.json(res, { status: res.status === "error" ? 422 : 200 });
 }

@@ -5,6 +5,7 @@
 import { STALE_AFTER_DAYS } from "@/lib/findings";
 import { LEVELS, POINTS } from "@/lib/reputation";
 import { LOW_RUNWAY_DAYS, SPIKE_RATIO } from "@/lib/watch";
+import { TRUST } from "@/lib/trust";
 import { viewer } from "@/lib/viewer";
 import { PageShell } from "@/components/page-shell";
 
@@ -16,6 +17,7 @@ const TOC: [string, string][] = [
   ["store", "Storing a finding"],
   ["confirm", "Confirmations"],
   ["levels", "Points and levels"],
+  ["trust", "Trust scores"],
   ["search", "Search, topics, members"],
   ["diagnose", "Diagnosing a transaction"],
   ["watch", "Your project (watchdog)"],
@@ -121,6 +123,33 @@ export default async function DocsPage() {
               head={["Level", "Rule", "Unlocks"]}
               rows={LEVELS.map((l) => [l.name, l.rule, l.unlocks ?? ""])}
             />
+          </Section>
+
+          <Section id="trust" title="Trust scores">
+            <p>
+              Every finding shows a trust score from 0 to 100. Click it to see the parts it is made of, so the
+              number is never a black box. Sabi quotes it when it answers and leads with the most trusted finding.
+            </p>
+            <Table
+              head={["Part", "Points"]}
+              rows={[
+                ["Verified by its author", `+${TRUST.verified}`],
+                [`Each other member who confirmed it (up to ${TRUST.maxConfirmers})`, `+${TRUST.perConfirmer} each`],
+                ["Each of those confirmers who has published Sui packages", `+${TRUST.builderConfirmer} each`],
+                ["The author has published Sui packages", `+${TRUST.builderAuthor}`],
+                ["On-chain evidence (a mainnet transaction, read before storing)", `+${TRUST.evidence}`],
+                ["The author is a Trusted or Steward member", `+${TRUST.trustedAuthor}`],
+                ["Stale: a volatile finding nobody re-verified in time", `${TRUST.stale}`],
+                [`Volatile and more than ${TRUST.agingAfterDays} days since last verified`, `${TRUST.aging}`],
+              ]}
+            />
+            <p>
+              75 and above is High, 50 to 74 Medium, below 50 Low. Published packages are read through Tatum from
+              the member&apos;s zkLogin address (the address Google sign-in gives them on Sui), counted as the
+              package upgrade capabilities it holds. That address is added to every finding and confirmation a
+              signed-in member stores, which links their handle to it in public. Members who have published show
+              a <em>Sui builder</em> tag on their profile.
+            </p>
           </Section>
 
           <Section id="search" title="Search, topics, members">

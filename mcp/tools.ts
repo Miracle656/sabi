@@ -10,6 +10,7 @@ import { getEnv } from "../lib/env";
 import { buildSystemPrompt } from "../lib/sabi-prompt";
 import { todayISO } from "../lib/findings";
 import { defaultNamespace, mode, searchFindings } from "../lib/memwal";
+import { withTrust } from "../lib/community";
 import { InspectInputSchema, RuleInputSchema, WatchInputSchema, inspectAction } from "../lib/diagnose";
 import { addRule, addWatch, projectStatus, statusForModel } from "../lib/watchdog";
 import {
@@ -61,7 +62,7 @@ export function registerSabi(server: McpServer): void {
     async ({ query, limit }) => {
       const today = todayISO();
       try {
-        const res = await searchFindings(query, { limit, today });
+        const res = withTrust(await searchFindings(query, { limit, today }));
         return text({
           query,
           today,

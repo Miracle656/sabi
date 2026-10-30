@@ -57,6 +57,10 @@ export interface Contributor {
   lastActive: string;
   points: number;
   level: Level;
+  /** Latest zkLogin address seen on this member's writes. */
+  address?: string;
+  /** Move packages that address has published (Tatum), when known. */
+  packages?: number;
 }
 
 export interface Topic {

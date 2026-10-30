@@ -156,6 +156,11 @@ export interface Finding {
   confirms?: string;
   /** A mainnet transaction digest that shows the issue; checked on-chain at write time. */
   evidence?: string;
+  /**
+   * The writer's zkLogin Sui address, from the signed-in session (never the
+   * model). Lets trust scores read the writer's on-chain history.
+   */
+  address?: string;
 }
 
 const SEP = " → ";
@@ -214,7 +219,7 @@ export function secretInFinding(
 /** Build a Finding from validated tool input, applying defaults. */
 export function toFinding(
   input: FindingInput,
-  opts: { today?: string; defaultReporter?: string } = {},
+  opts: { today?: string; defaultReporter?: string; address?: string } = {},
 ): Finding {
   const today = opts.today ?? todayISO();
   const out: Finding = {
@@ -233,6 +238,7 @@ export function toFinding(
   if (supersedes) out.supersedes = supersedes;
   const evidence = input.evidence_tx?.trim();
   if (evidence) out.evidence = evidence;
+  if (opts.address) out.address = opts.address.toLowerCase();
   return out;
 }
 
@@ -251,6 +257,7 @@ export function formatFinding(f: Finding): string {
     `volatile:${f.volatile ? "yes" : "no"}`,
   ];
   if (f.reportedBy) tail.push(`by:${f.reportedBy}`);
+  if (f.address) tail.push(`addr:${f.address}`);
   if (f.supersedes) tail.push(`SUPERSEDES:${f.supersedes}`);
   if (f.confirms) tail.push(`CONFIRMS:${f.confirms}`);
   if (f.evidence) tail.push(`EVIDENCE:${f.evidence}`);
@@ -317,6 +324,10 @@ export function parseFinding(text: string): Finding | null {
   };
   for (const extra of extras) {
     if (extra.startsWith("by:")) out.reportedBy = extra.slice(3).trim();
+    else if (extra.startsWith("addr:")) {
+      const a = extra.slice(5).trim().toLowerCase();
+      if (/^0x[0-9a-f]{1,64}$/.test(a)) out.address = a;
+    }
     else if (extra.startsWith("SUPERSEDES:")) {
       // Rows stored before the input gate existed carry "SUPERSEDES:null"; a
       // pointer that names nothing is no pointer.
@@ -342,7 +353,7 @@ export function parseFinding(text: string): Finding | null {
 export function toConfirmation(
   target: Finding,
   targetId: string,
-  opts: { reporter: string; today?: string },
+  opts: { reporter: string; today?: string; address?: string },
 ): Finding {
   const reportedBy = normalizeReporter(opts.reporter);
   return {
@@ -355,6 +366,7 @@ export function toConfirmation(
     version: target.version,
     volatile: target.volatile,
     ...(reportedBy ? { reportedBy } : {}),
+    ...(opts.address ? { address: opts.address.toLowerCase() } : {}),
     confirms: targetId,
   };
 }
@@ -400,6 +412,8 @@ export interface Confirmation {
   on: string; // YYYY-MM-DD
   /** The original author re-verifying their own finding: refreshes the date, earns nothing. */
   self: boolean;
+  /** The confirmer's zkLogin address, when they were signed in. */
+  address?: string;
 }
 
 /** One recalled memory, enriched for the model and the UI. */
@@ -418,6 +432,8 @@ export interface RecalledFinding {
   confirmations?: Confirmation[];
   /** Newest of verifiedOn and every confirmation date; staleness runs from this. */
   last_verified?: string;
+  /** Trust score with its parts, when computed (lib/trust.ts). */
+  trust?: import("./trust").Trust;
 }
 
 /**
@@ -463,6 +479,7 @@ export function resolveHits(
       by: h.finding!.reportedBy,
       on: h.finding!.verifiedOn,
       self: sameHandle(h.finding!.reportedBy, target.finding.reportedBy),
+      ...(h.finding!.address ? { address: h.finding!.address } : {}),
     };
     target.confirmations = [...(target.confirmations ?? []), c].sort((a, b) =>
       a.on < b.on ? -1 : a.on > b.on ? 1 : 0,

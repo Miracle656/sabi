@@ -200,6 +200,8 @@ export function FindingCard({
               Replaced
             </span>
           )}
+          <span className="grow" />
+          {hit.trust && !superseded && <TrustChip trust={hit.trust} />}
         </div>
 
         <p className="text-[14.5px] leading-relaxed text-muted [overflow-wrap:anywhere]">
@@ -273,6 +275,42 @@ export function FindingCard({
         )}
       </div>
     </article>
+  );
+}
+
+/**
+ * The trust score, and on click the parts it is made of. Colour follows the
+ * verification-state rule: High reads ok, Low reads warn.
+ */
+function TrustChip({ trust }: { trust: NonNullable<RecalledFinding["trust"]> }) {
+  const tone = trust.label === "High" ? "text-ok border-ok" : trust.label === "Low" ? "text-warn border-warn" : "text-muted border-line2";
+  return (
+    <details className="group relative">
+      <summary
+        className={`nums inline-flex cursor-pointer list-none items-center gap-1.5 rounded-full border px-2 py-px text-[11.5px] ${tone}`}
+        title="Why this score"
+      >
+        Trust {trust.score}
+        <span className="text-[10px] opacity-70">{trust.label}</span>
+      </summary>
+      <div className="absolute right-0 top-[calc(100%+6px)] z-20 w-[280px] rounded-[var(--r)] border border-line2 bg-[var(--paper)] p-3 shadow-[var(--shadow-lg)]">
+        <span className="eyebrow text-faint">Why trust {trust.score}</span>
+        <ul className="nums mt-2 flex flex-col gap-1.5 text-[12.5px]">
+          {trust.parts.map((p) => (
+            <li key={p.label} className="flex items-baseline justify-between gap-3">
+              <span className="text-muted">{p.label}</span>
+              <span className={p.points < 0 ? "text-warn" : "text-ink"}>
+                {p.points > 0 ? "+" : ""}
+                {p.points}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <a href="/docs#trust" className="mt-2.5 block text-[12px] text-faint underline decoration-line2 underline-offset-2 hover:text-ink">
+          How trust is scored
+        </a>
+      </div>
+    </details>
   );
 }
 

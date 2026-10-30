@@ -43,10 +43,6 @@ export default async function Landing() {
         {/* ── hero ───────────────────────────────────────────────────────── */}
         <section className="mx-auto grid w-full max-w-[1180px] grid-cols-1 gap-12 px-5 pb-16 pt-14 sm:px-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:pt-20">
           <div className="flex min-w-0 flex-col gap-6">
-            <span className="eyebrow inline-flex w-fit items-center gap-2 rounded-full border border-line2 px-3 py-1.5 text-muted">
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--ok)]" aria-hidden="true" />
-              Live on Walrus mainnet · Sui reads via Tatum
-            </span>
             <h1 className="display max-w-[16ch] text-[40px] font-normal leading-[1.04] sm:text-[54px] lg:text-[62px]">
               The memory your Sui project should have had.
             </h1>
