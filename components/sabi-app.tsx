@@ -52,9 +52,12 @@ const RECALL = "tool-recall_findings";
 const STORE = "tool-remember_finding";
 const CONFIRM = "tool-confirm_finding";
 const INSPECT = "tool-inspect_transaction";
+const WATCH = "tool-watch_address";
+const STATUS = "tool-project_status";
+const TOOL_TYPES = new Set([RECALL, STORE, CONFIRM, INSPECT, WATCH, STATUS]);
 
 function isToolPart(p: { type: string }): p is ToolPart {
-  return p.type === RECALL || p.type === STORE || p.type === CONFIRM || p.type === INSPECT;
+  return TOOL_TYPES.has(p.type);
 }
 
 const EXAMPLES = [
@@ -598,7 +601,11 @@ function ToolPartView({
     }
     return (
       <ActivityRow spinner>
-        {isInspect
+        {part.type === WATCH
+          ? "Reading the balance from Sui and remembering it…"
+          : part.type === STATUS
+          ? "Reading your project memory…"
+          : isInspect
           ? "Reading the transaction from Sui mainnet…"
           : isRecall
           ? "Checking community memory…"
@@ -609,6 +616,39 @@ function ToolPartView({
 
   if (part.state === "output-error") {
     return <ActivityRow tone="bad">Tool fail: {part.errorText ?? "unknown error"}</ActivityRow>;
+  }
+
+  if (part.type === WATCH) {
+    const out = part.output as { status: string; error?: string; watch?: { address: string; label: string } };
+    return out.status === "error" ? (
+      <ActivityRow tone="bad">{out.error}</ActivityRow>
+    ) : (
+      <ActivityRow tone="ok">
+        <span>
+          Watching <span className="text-ink">{out.watch?.label}</span> · balance remembered on Walrus ·{" "}
+          <a href="/watch" className="underline decoration-line2 underline-offset-2 hover:text-ink">
+            Your project
+          </a>
+        </span>
+      </ActivityRow>
+    );
+  }
+
+  if (part.type === STATUS) {
+    const out = part.output as { error?: string; projects?: { label: string; alerts: unknown[] }[] };
+    if (out.error) return <ActivityRow tone="bad">{out.error}</ActivityRow>;
+    const alerts = (out.projects ?? []).reduce((n, p) => n + p.alerts.length, 0);
+    return (
+      <ActivityRow tone={alerts ? "bad" : "ok"}>
+        <span>
+          Read your project memory · {out.projects?.length ?? 0} watched · {alerts}{" "}
+          {alerts === 1 ? "alert" : "alerts"} ·{" "}
+          <a href="/watch" className="underline decoration-line2 underline-offset-2 hover:text-ink">
+            open
+          </a>
+        </span>
+      </ActivityRow>
+    );
   }
 
   if (isInspect) {
@@ -942,7 +982,7 @@ function Ledger({
         </svg>
         {mock
           ? "Mock memory: these ids are not on Walrus."
-          : "Every row na one encrypted blob you fit open."}
+          : "Every row is one encrypted blob you can open."}
       </div>
     </div>
   );
@@ -977,6 +1017,12 @@ function LedgerItem({
       <span className="text-faint">
         {isRecall ? "recalling…" : part.type === INSPECT ? "reading Sui…" : "storing…"}
       </span>
+    );
+  } else if (part.type === WATCH || part.type === STATUS) {
+    body = (
+      <a href="/watch" className="text-faint underline decoration-line2 underline-offset-2 hover:text-ink">
+        {part.type === WATCH ? "address added to your project" : "project memory read"}
+      </a>
     );
   } else if (part.type === INSPECT) {
     const out = part.output as InspectResult;
@@ -1042,7 +1088,17 @@ function LedgerItem({
     <div className="flex flex-col gap-1.5 border-b border-line px-6 py-3.5">
       <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.1em]">
         <span className={isRecall ? "text-muted" : "text-ok"}>
-          {isRecall ? "Recall" : part.type === INSPECT ? "Chain read" : part.type === CONFIRM ? "Confirm" : "Store"}
+          {isRecall
+            ? "Recall"
+            : part.type === INSPECT
+              ? "Chain read"
+              : part.type === WATCH
+                ? "Watch"
+                : part.type === STATUS
+                  ? "Project"
+                  : part.type === CONFIRM
+                    ? "Confirm"
+                    : "Store"}
         </span>
         <span className="mono tracking-normal text-faint">{time}</span>
       </div>

@@ -76,6 +76,31 @@ that recall can find (a model once invented `noop0000`), and every write carries
 an idempotency key derived from its text, so a retried or double-clicked write
 lands once.
 
+## On-chain: Tatum Sui RPC
+
+Sabi reads Sui mainnet through Tatum's Sui gateway (`lib/tatum.ts`, the only file
+that talks to Tatum). Tatum's Sui JSON-RPC endpoint answers 404, so this uses Sui
+gRPC over a native `@grpc/grpc-js` transport, with retries for the free plan's 429s.
+
+- **Diagnose a transaction.** Paste a digest or explorer link; `inspect_transaction`
+  reads it and names the failure exactly (`MoveAbort 101 in 0xfa55…9ae1::m::z`,
+  failing command, gas), then recalls community findings for that exact failure.
+- **On-chain evidence.** A finding can carry `evidence_tx`; the digest is read on
+  mainnet before anything is stored, and the card shows an evidence badge.
+- **Watchdog (`/watch`).** Each member gets a personal namespace
+  (`<community>--u-<handle>`) holding the addresses they watch, SUI balance
+  snapshots read through Tatum, and failures Sabi diagnosed for those addresses.
+  `lib/watch.ts` turns them into spend per day against the member's own baseline
+  (median of earlier intervals), gas runway, spend spikes (≥2×), and new or
+  repeating failures — each linked to the community's verified fix. Snapshots are
+  taken when the page is opened (if the last is >6h old) and daily by Vercel Cron
+  (`vercel.json` → `/api/cron/watch`, which only runs when `CRON_SECRET` is set).
+  The same data is available as `watch_address` / `project_status` tools in chat
+  and over MCP.
+
+Tatum's Data API (transaction history by address) does not support Sui, so the
+watchdog measures spend from balance snapshots rather than a transaction feed.
+
 ## MCP server
 
 The same three tools (recall, remember, confirm), exposed to any MCP client (Claude Desktop, Cursor, ...):

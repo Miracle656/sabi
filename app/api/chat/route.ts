@@ -20,7 +20,8 @@ import { DEFAULT_MODEL_ID, isClaudeModel, modelIds } from "@/lib/models";
 import { buildSystemPrompt } from "@/lib/sabi-prompt";
 import { todayISO } from "@/lib/findings";
 import { searchFindings } from "@/lib/memwal";
-import { InspectInputSchema, inspectAction } from "@/lib/diagnose";
+import { InspectInputSchema, WatchInputSchema, inspectAction } from "@/lib/diagnose";
+import { addWatch, projectStatus, statusForModel } from "@/lib/watchdog";
 import {
   ConfirmInputSchema,
   RememberInputSchema,
@@ -132,7 +133,32 @@ export async function POST(req: Request) {
       description:
         "Read a Sui mainnet transaction (via Tatum) and name its failure exactly: abort code, package::module::function, gas. Then recalls community findings for that exact failure. Call FIRST whenever the user shares a transaction digest or an explorer link.",
       inputSchema: InspectInputSchema,
-      execute: (input) => inspectAction(input, today),
+      execute: (input) => inspectAction(input, today, session?.handle),
+    }),
+    watch_address: tool({
+      description:
+        "Start watching a Sui address for the signed-in user: its SUI balance is read through Tatum and remembered over time, so Sabi can spot spend spikes, low gas runway and recurring failures. Use when the user names their project's deployer/treasury address or asks Sabi to keep an eye on it.",
+      inputSchema: WatchInputSchema,
+      execute: async ({ address, label }) =>
+        session
+          ? addWatch(session.handle, address, label ?? "").catch((err: unknown) => ({
+              status: "error" as const,
+              error: err instanceof Error ? err.message : String(err),
+            }))
+          : { status: "error" as const, error: "Refused: watching is personal memory, so the user must sign in first." },
+    }),
+    project_status: tool({
+      description:
+        "The signed-in user's watched projects from their personal memory: balance, burn per day vs their baseline, runway, alerts, failures seen and the community's fixes for them. Call when the user asks how their project is doing, about gas spend, or what has been failing.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        if (!session) return { error: "Sign in to see your project." };
+        try {
+          return statusForModel(await projectStatus(session.handle));
+        } catch (err) {
+          return { error: err instanceof Error ? err.message : String(err) };
+        }
+      },
     }),
     remember_finding: tool({
       description:

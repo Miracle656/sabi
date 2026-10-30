@@ -32,6 +32,7 @@ import type {
   HealthResult,
   ListMemoriesOptions,
   MemoriesResult,
+  NamespacesResult,
   RecallParams,
   RecallResult,
   RememberAcceptedResult,
@@ -59,6 +60,7 @@ interface MemoryClient {
   health(): Promise<HealthResult>;
   /** Live client only: the mock has no inventory walk. */
   listMemories?(options?: ListMemoriesOptions): Promise<MemoriesResult>;
+  listNamespaces?(options?: { cursor?: string; limit?: number }): Promise<NamespacesResult>;
 }
 type AnyClient = MemoryClient;
 
@@ -384,6 +386,46 @@ export async function sweepNamespace(
     }
   }
   return { hits: [...seen.values()], total: await countMemories(c, ns) };
+}
+
+export interface RawMemory {
+  memory_id: string;
+  text: string;
+  created_at?: string;
+}
+
+/**
+ * Newest-first raw lines from any namespace, no distance floor and no finding
+ * parsing. For small structured namespaces (a member's watchdog memory) where
+ * the caller wants everything, not the best semantic match.
+ */
+export async function recallLines(
+  namespace: string,
+  query: string,
+  limit = 100,
+): Promise<RawMemory[]> {
+  const c = await client();
+  const res = await withRetry(() => c.recall({ query, limit, namespace, sort: "recent" }));
+  return res.results.map((r) => ({
+    memory_id: r.blob_id,
+    text: r.text,
+    ...(r.created_at ? { created_at: r.created_at } : {}),
+  }));
+}
+
+/** Names of every namespace on the account starting with `prefix` (live client only). */
+export async function namespacesWithPrefix(prefix: string): Promise<string[]> {
+  const c = await client();
+  if (!c.listNamespaces) return [];
+  const out: string[] = [];
+  let cursor: string | undefined;
+  for (let page = 0; page < 20; page++) {
+    const res = await withRetry(() => c.listNamespaces!({ cursor, limit: 500 }));
+    for (const ns of res.namespaces) if (ns.name.startsWith(prefix)) out.push(ns.name);
+    if (!res.has_more) break;
+    cursor = res.next_cursor ?? undefined;
+  }
+  return out;
 }
 
 /** How many memories the namespace holds, or null when the client cannot list. */

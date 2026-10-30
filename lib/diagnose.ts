@@ -6,6 +6,7 @@ import { z } from "zod";
 import { searchFindings } from "./memwal";
 import { findDigest, mistToSui, suiscanTx, type TxReport } from "./onchain";
 import { inspectTransaction, tatumEnabled } from "./tatum";
+import { recordFailure } from "./watchdog";
 import type { RecalledFinding } from "./findings";
 
 export const InspectInputSchema = z.object({
@@ -24,6 +25,8 @@ export type InspectResult =
       tx: Omit<TxReport, "calls"> & { calls: string[]; moreCalls: number };
       gas_sui?: string;
       explorer: string;
+      /** True when the failure was remembered against one of the member's watched addresses. */
+      recorded: boolean;
       /** Community findings recalled for the failure signature. */
       active: RecalledFinding[];
       superseded: RecalledFinding[];
@@ -33,7 +36,20 @@ export type InspectResult =
 
 const SHOWN_CALLS = 6;
 
-export async function inspectAction(input: InspectInput, today: string): Promise<InspectResult> {
+export const WatchInputSchema = z.object({
+  address: z.string().trim().describe("The Sui address to watch (0x...), e.g. the project's deployer or treasury."),
+  label: z.string().trim().max(60).optional().describe("A short name for it, e.g. 'mainnet deployer'."),
+});
+
+/**
+ * `member`: the signed-in handle. When the transaction failed from one of
+ * their watched addresses, the failure is remembered for their watchdog.
+ */
+export async function inspectAction(
+  input: InspectInput,
+  today: string,
+  member?: string,
+): Promise<InspectResult> {
   if (!tatumEnabled()) {
     return { status: "error", error: "On-chain reads are not configured on this instance (TATUM_API_KEY)." };
   }
@@ -51,6 +67,14 @@ export async function inspectAction(input: InspectInput, today: string): Promise
     const modules = [...new Set(tx.calls.map((c) => c.split("::").slice(1).join("::")))].slice(0, 4);
     const query = [tx.signature, ...modules].join(" ");
     const recalled = await searchFindings(query, { limit: 5, today });
+    let recorded = false;
+    if (member) {
+      try {
+        recorded = await recordFailure(member, tx);
+      } catch {
+        /* the diagnosis stands even if the watchdog write fails */
+      }
+    }
     return {
       status: "ok",
       tx: {
@@ -60,6 +84,7 @@ export async function inspectAction(input: InspectInput, today: string): Promise
       },
       gas_sui: tx.gas ? mistToSui(tx.gas.net) : undefined,
       explorer: suiscanTx(tx.digest),
+      recorded,
       active: recalled.active,
       superseded: recalled.superseded,
       note: tx.ok

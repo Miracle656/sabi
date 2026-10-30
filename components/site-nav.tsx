@@ -10,7 +10,7 @@ import { profileHref } from "@/lib/links";
 import { SignIn, type SabiUser } from "./sign-in";
 import { ThemeToggle } from "./theme-toggle";
 
-export type Section = "home" | "findings" | "topics" | "members";
+export type Section = "home" | "findings" | "topics" | "members" | "watch";
 
 interface Standing {
   points: number;
@@ -183,6 +183,7 @@ const ICONS: Record<string, React.ReactNode> = {
       <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 4.5a3.2 3.2 0 010 6.3M18 14.2c1.8.7 3 2.6 3 4.8" />
     </>
   ),
+  watch: <path d="M3 12h4l3-8 4 16 3-8h4" />,
   levels: <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0V4zM7 6H4v1a3 3 0 003 3M17 6h3v1a3 3 0 01-3 3" />,
   help: (
     <>
@@ -215,6 +216,9 @@ function SidebarLinks({ active, user }: { active?: Section; user?: SabiUser }) {
     <nav aria-label="Main" className="flex flex-col gap-0.5 px-2 pb-6">
       <SideLink href="/" icon="home" current={active === "home"}>
         Ask Sabi
+      </SideLink>
+      <SideLink href="/watch" icon="watch" current={active === "watch"}>
+        Your project
       </SideLink>
       <SideLink href="/community" icon="findings" current={active === "findings"}>
         Findings

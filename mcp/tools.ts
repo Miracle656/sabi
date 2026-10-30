@@ -10,7 +10,8 @@ import { getEnv } from "../lib/env";
 import { buildSystemPrompt } from "../lib/sabi-prompt";
 import { todayISO } from "../lib/findings";
 import { defaultNamespace, mode, searchFindings } from "../lib/memwal";
-import { InspectInputSchema, inspectAction } from "../lib/diagnose";
+import { InspectInputSchema, WatchInputSchema, inspectAction } from "../lib/diagnose";
+import { addWatch, projectStatus, statusForModel } from "../lib/watchdog";
 import {
   ConfirmInputSchema,
   RememberInputSchema,
@@ -88,8 +89,45 @@ export function registerSabi(server: McpServer): void {
       inputSchema: InspectInputSchema.shape,
     },
     async (input) => {
-      const res = await inspectAction(input, todayISO());
+      const res = await inspectAction(input, todayISO(), getEnv().reporter);
       return res.status === "error" ? failure(res.error) : text(res);
+    },
+  );
+
+  // MCP has no sign-in: the watchdog belongs to this instance's SABI_REPORTER,
+  // the same member every write through this server is attributed to.
+  server.registerTool(
+    "watch_address",
+    {
+      title: "Watch a Sui address",
+      description:
+        "Start watching a Sui address: its SUI balance is read through Tatum and remembered over time, so Sabi can spot spend spikes, low gas runway and recurring failures.",
+      inputSchema: WatchInputSchema.shape,
+    },
+    async ({ address, label }) => {
+      try {
+        const res = await addWatch(getEnv().reporter, address, label ?? "");
+        return res.status === "error" ? failure(res.error) : text(res);
+      } catch (err) {
+        return failure(describe(err));
+      }
+    },
+  );
+
+  server.registerTool(
+    "project_status",
+    {
+      title: "How is my project doing",
+      description:
+        "Watched projects from personal memory: balance, burn per day vs baseline, runway, alerts, failures seen and the community's fixes for them.",
+      inputSchema: {},
+    },
+    async () => {
+      try {
+        return text(statusForModel(await projectStatus(getEnv().reporter)));
+      } catch (err) {
+        return failure(describe(err));
+      }
     },
   );
 
