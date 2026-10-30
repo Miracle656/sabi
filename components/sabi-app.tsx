@@ -187,7 +187,7 @@ export function SabiApp({
   useEffect(() => {
     if (!initialAsk || asked.current) return;
     asked.current = true;
-    window.history.replaceState(null, "", "/");
+    window.history.replaceState(null, "", "/ask");
     send(initialAsk);
   }, [initialAsk, send]);
 

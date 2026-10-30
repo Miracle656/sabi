@@ -5,7 +5,7 @@ blocking the WalletConnect relay, a payments API that disagrees with its docs, a
 that starts rate-limiting, an SDK upgrade that breaks signing — stored on Walrus
 through Walrus Memory (MemWal) and recalled by **any** AI model.
 
-Live: **https://sabi-sage.vercel.app** · MCP endpoint: `https://sabi-sage.vercel.app/api/mcp`
+Live: **https://sabi-sage.vercel.app** (landing) · chat at `/ask` · docs at `/docs` · MCP endpoint: `https://sabi-sage.vercel.app/api/mcp`
 
 Developers rediscover the same problems from scratch because the fix dies in a chat
 scrollback. Sabi stores each *verified* finding as a memory on Walrus, recalls it

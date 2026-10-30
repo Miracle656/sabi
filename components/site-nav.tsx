@@ -11,7 +11,7 @@ import { SignIn, type SabiUser } from "./sign-in";
 import { SearchBox } from "./search-box";
 import { ThemeToggle } from "./theme-toggle";
 
-export type Section = "home" | "findings" | "topics" | "members" | "watch";
+export type Section = "home" | "findings" | "topics" | "members" | "watch" | "docs";
 
 interface Standing {
   points: number;
@@ -79,7 +79,7 @@ export function SiteNav({
         </a>
 
         <nav aria-label="Sections" className="hidden items-center xl:flex">
-          <NavLink href="/" current={active === "home"}>
+          <NavLink href="/ask" current={active === "home"}>
             Ask
           </NavLink>
           <NavLink href="/community" current={active === "findings"}>
@@ -87,6 +87,9 @@ export function SiteNav({
           </NavLink>
           <NavLink href="/members" current={active === "members"}>
             Members
+          </NavLink>
+          <NavLink href="/docs" current={active === "docs"}>
+            Docs
           </NavLink>
         </nav>
 
@@ -169,6 +172,7 @@ const ICONS: Record<string, React.ReactNode> = {
       <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 4.5a3.2 3.2 0 010 6.3M18 14.2c1.8.7 3 2.6 3 4.8" />
     </>
   ),
+  docs: <path d="M5 4h9l5 5v11a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1zM14 4v5h5M8 13h8M8 17h5" />,
   watch: <path d="M3 12h4l3-8 4 16 3-8h4" />,
   levels: <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0V4zM7 6H4v1a3 3 0 003 3M17 6h3v1a3 3 0 01-3 3" />,
   help: (
@@ -200,7 +204,7 @@ function Icon({ name, size = 17 }: { name: string; size?: number }) {
 function SidebarLinks({ active, user }: { active?: Section; user?: SabiUser }) {
   return (
     <nav aria-label="Main" className="flex flex-col gap-0.5 px-2 pb-6">
-      <SideLink href="/" icon="home" current={active === "home"}>
+      <SideLink href="/ask" icon="home" current={active === "home"}>
         Ask Sabi
       </SideLink>
       <SideLink href="/watch" icon="watch" current={active === "watch"}>
@@ -224,8 +228,12 @@ function SidebarLinks({ active, user }: { active?: Section; user?: SabiUser }) {
         </SideLink>
       )}
 
+      <SideLink href="/docs" icon="docs" current={active === "docs"}>
+        Docs
+      </SideLink>
+
       <span className="eyebrow mt-6 px-3 pb-1.5 text-faint">Use it anywhere</span>
-      <SideLink href="https://github.com/Miracle656/sabi#mcp-server" icon="mcp" external>
+      <SideLink href="/docs#mcp" icon="mcp">
         MCP for your AI tool
       </SideLink>
       <SideLink href="https://github.com/Miracle656/sabi" icon="github" external>

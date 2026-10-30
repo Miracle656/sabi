@@ -87,7 +87,7 @@ export function SearchBox({ initial = "" }: { initial?: string }) {
     })),
     ...(results?.members ?? []).map((m) => ({ key: m.handle, href: profileHref(m.handle) })),
     { key: "all", href: `/community?q=${encodeURIComponent(term)}` },
-    { key: "ask", href: `/?ask=${encodeURIComponent(term)}` },
+    { key: "ask", href: `/ask?ask=${encodeURIComponent(term)}` },
   ];
   const showPanel = open && term.length >= 2;
 
@@ -216,7 +216,7 @@ export function SearchBox({ initial = "" }: { initial?: string }) {
                   See all {results.total} {results.total === 1 ? "result" : "results"} for &ldquo;{term}&rdquo;
                 </span>
               </div>
-              <div {...optionProps(`/?ask=${encodeURIComponent(term)}`)}>
+              <div {...optionProps(`/ask?ask=${encodeURIComponent(term)}`)}>
                 <span className="text-[13px] text-ink">
                   Ask Sabi about &ldquo;{term}&rdquo; <span className="text-faint">· searches by meaning</span>
                 </span>

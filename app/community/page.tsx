@@ -69,7 +69,7 @@ export default async function FindingsPage(props: { searchParams: Search }) {
             </p>
           </div>
           <a
-            href="/"
+            href="/ask"
             className="rounded-[var(--r)] bg-ink px-3.5 py-2 text-[13.5px] font-medium text-[var(--paper)] transition-opacity hover:opacity-85"
           >
             Ask Sabi
