@@ -186,10 +186,15 @@ h1.display,
   text-transform: uppercase;
 }
 
-/* Focus that survives keyboard navigation in both themes. */
-:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
+/* Focus that survives keyboard navigation in both themes. In the base layer,
+   so a field that draws its own focus state (border on the wrapper, via
+   focus-within) can switch the ring off with a utility - unlayered CSS beats
+   every Tailwind utility, which is how the composer got a box inside its box. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+  }
 }
 
 ::selection {

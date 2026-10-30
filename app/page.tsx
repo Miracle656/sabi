@@ -11,7 +11,11 @@ import { SESSION_COOKIE, openSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
-export default async function Page() {
+export default async function Page(props: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const askParam = (await props.searchParams).ask;
+  const ask = (Array.isArray(askParam) ? askParam[0] : askParam)?.trim().slice(0, 500) || undefined;
   const env = getEnv();
   const missing = missingVars(env);
   if (missing.length) {
@@ -50,6 +54,7 @@ export default async function Page() {
       models={models}
       user={session ? { handle: session.handle, address: session.address } : undefined}
       googleClientId={env.googleClientId || undefined}
+      initialAsk={ask}
     />
   );
 }

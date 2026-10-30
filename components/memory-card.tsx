@@ -174,7 +174,8 @@ export function FindingCard({
 
   return (
     <article
-      className={`enter grid grid-cols-[3px_1fr] overflow-hidden rounded-[var(--r)] border border-line ${
+      id={hit.memory_id}
+      className={`enter grid scroll-mt-24 grid-cols-[3px_1fr] overflow-hidden rounded-[var(--r)] border border-line target:border-ink ${
         superseded ? "" : "bg-surface2"
       }`}
     >

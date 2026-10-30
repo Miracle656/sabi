@@ -8,6 +8,7 @@
 import { useEffect, useState } from "react";
 import { profileHref } from "@/lib/links";
 import { SignIn, type SabiUser } from "./sign-in";
+import { SearchBox } from "./search-box";
 import { ThemeToggle } from "./theme-toggle";
 
 export type Section = "home" | "findings" | "topics" | "members" | "watch";
@@ -89,22 +90,7 @@ export function SiteNav({
           </NavLink>
         </nav>
 
-        <form action="/community" method="get" role="search" className="min-w-0 flex-1">
-          <label className="flex h-9 items-center gap-2 rounded-[var(--r)] border border-edge bg-[var(--composer-fill)] px-2.5 focus-within:border-ink">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="shrink-0 text-faint" aria-hidden="true">
-              <circle cx="11" cy="11" r="7" />
-              <path d="M20 20l-3.5-3.5" />
-            </svg>
-            <span className="sr-only">Search verified findings</span>
-            <input
-              type="search"
-              name="q"
-              defaultValue={query}
-              placeholder="Search verified findings…"
-              className="min-w-0 flex-1 bg-transparent text-[14px] text-ink placeholder:text-faint focus:outline-none"
-            />
-          </label>
-        </form>
+        <SearchBox initial={query} />
 
         {children}
 

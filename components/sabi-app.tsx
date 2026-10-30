@@ -77,6 +77,8 @@ export interface SabiAppProps {
   user?: SabiUser;
   /** Present iff sign-in is configured on this instance. */
   googleClientId?: string;
+  /** A question to send on arrival (from the search box's "Ask Sabi about ..."). */
+  initialAsk?: string;
 }
 
 export function SabiApp({
@@ -87,6 +89,7 @@ export function SabiApp({
   models,
   user,
   googleClientId,
+  initialAsk,
 }: SabiAppProps) {
   const [modelId, setModelId] = useState(models[0]?.id ?? "");
   const [input, setInput] = useState("");
@@ -177,6 +180,16 @@ export function SabiApp({
     },
     [busy, modelId, sendMessage],
   );
+
+  // Ask the question the search box handed over, once, then drop it from the
+  // URL so a reload does not ask it again.
+  const asked = useRef(false);
+  useEffect(() => {
+    if (!initialAsk || asked.current) return;
+    asked.current = true;
+    window.history.replaceState(null, "", "/");
+    send(initialAsk);
+  }, [initialAsk, send]);
 
   const empty = messages.length === 0;
 
@@ -858,7 +871,7 @@ function Composer({
         className="pointer-events-auto mx-auto w-full max-w-[var(--composer-max)]"
       >
         <MobileModel models={models} modelId={modelId} onModel={onModel} />
-        <div className="flex items-end gap-2.5 rounded-[14px] border border-edge bg-[var(--composer-fill)] py-2.5 pl-4 pr-2.5 shadow-[var(--shadow)]">
+        <div className="flex items-end gap-2.5 rounded-[14px] border border-edge bg-[var(--composer-fill)] transition-colors focus-within:border-ink py-2.5 pl-4 pr-2.5 shadow-[var(--shadow)]">
           <textarea
             ref={ta}
             value={value}
@@ -871,7 +884,7 @@ function Composer({
             }}
             rows={1}
             placeholder="Describe the blocker, or tell Sabi what you verified…"
-            className="max-h-40 min-h-[38px] grow resize-none bg-transparent py-1.5 text-[16px] leading-relaxed outline-none [field-sizing:content] placeholder:text-muted sm:text-[15px]"
+            className="max-h-40 min-h-[38px] grow resize-none bg-transparent py-1.5 text-[16px] leading-relaxed outline-none focus-visible:outline-none [field-sizing:content] placeholder:text-muted sm:text-[15px]"
           />
           {busy ? (
             <button
