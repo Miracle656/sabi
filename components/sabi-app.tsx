@@ -7,7 +7,8 @@ import type { Finding, RecalledFinding } from "@/lib/findings";
 import { walruscanUrl, type Network } from "@/lib/links";
 import type { ModelOption } from "@/lib/models";
 import { Markdown } from "./markdown";
-import { FindingCard, Handle, IdChip, SavedCard, ViewerProvider } from "./memory-card";
+import { FindingCard, Handle, IdChip, SavedCard, TxCard, ViewerProvider } from "./memory-card";
+import type { InspectResult } from "@/lib/diagnose";
 import { SiteNav, Sidebar } from "./site-nav";
 import type { SabiUser } from "./sign-in";
 
@@ -50,9 +51,10 @@ export interface ResolvedWrite {
 const RECALL = "tool-recall_findings";
 const STORE = "tool-remember_finding";
 const CONFIRM = "tool-confirm_finding";
+const INSPECT = "tool-inspect_transaction";
 
 function isToolPart(p: { type: string }): p is ToolPart {
-  return p.type === RECALL || p.type === STORE || p.type === CONFIRM;
+  return p.type === RECALL || p.type === STORE || p.type === CONFIRM || p.type === INSPECT;
 }
 
 const EXAMPLES = [
@@ -583,19 +585,22 @@ function ToolPartView({
 }) {
   const isRecall = part.type === RECALL;
   const isConfirm = part.type === CONFIRM;
+  const isInspect = part.type === INSPECT;
 
   if (part.state === "input-streaming" || part.state === "input-available") {
     // Stop/reload leaves a tool part with no output. Never spin forever.
     if (settled) {
       return (
         <ActivityRow tone="faint">
-          {isRecall ? "Recall stopped before it finished." : "Write stopped before it finished."}
+          {isRecall || isInspect ? "Read stopped before it finished." : "Write stopped before it finished."}
         </ActivityRow>
       );
     }
     return (
       <ActivityRow spinner>
-        {isRecall
+        {isInspect
+          ? "Reading the transaction from Sui mainnet…"
+          : isRecall
           ? "Checking community memory…"
           : `${isConfirm ? "Storing your confirmation" : "Storing it"} ${mock ? "in mock memory" : "on Walrus"}…`}
       </ActivityRow>
@@ -604,6 +609,30 @@ function ToolPartView({
 
   if (part.state === "output-error") {
     return <ActivityRow tone="bad">Tool fail: {part.errorText ?? "unknown error"}</ActivityRow>;
+  }
+
+  if (isInspect) {
+    const out = part.output as InspectResult;
+    if (out.status === "error") {
+      return <ActivityRow tone="bad">{out.error}</ActivityRow>;
+    }
+    return (
+      <div className="flex flex-col gap-3">
+        <TxCard tx={out.tx} gasSui={out.gas_sui} explorer={out.explorer} />
+        {!out.tx.ok && (
+          <ActivityRow tone={out.active.length ? "ok" : "faint"}>
+            <span>
+              {out.active.length
+                ? `${out.active.length} community ${out.active.length === 1 ? "finding" : "findings"} for this failure`
+                : "No community finding for this exact failure yet"}
+            </span>
+          </ActivityRow>
+        )}
+        {out.active.map((h) => (
+          <FindingCard key={h.memory_id} hit={h} network={network} mock={mock} />
+        ))}
+      </div>
+    );
   }
 
   if (isRecall) {
@@ -848,7 +877,7 @@ function Ledger({
   const recalls = entries.filter((e) => e.part.type === RECALL).length;
   // Only a blob that actually landed counts as a write. Refused, failed and
   // still-uploading attempts are reported separately rather than tallied green.
-  const writes = entries.filter((e) => e.part.type !== RECALL);
+  const writes = entries.filter((e) => e.part.type === STORE || e.part.type === CONFIRM);
   const stores = writes.filter((e) => {
     const out = e.part.output as StoreOutput | undefined;
     const r = resolved[e.part.toolCallId];
@@ -944,7 +973,32 @@ function LedgerItem({
   if (part.state === "output-error") {
     body = <span className="text-bad">{part.errorText ?? "tool failed"}</span>;
   } else if (pending) {
-    body = <span className="text-faint">{isRecall ? "recalling…" : "storing…"}</span>;
+    body = (
+      <span className="text-faint">
+        {isRecall ? "recalling…" : part.type === INSPECT ? "reading Sui…" : "storing…"}
+      </span>
+    );
+  } else if (part.type === INSPECT) {
+    const out = part.output as InspectResult;
+    body =
+      out.status === "error" ? (
+        <span className="text-bad">{out.error}</span>
+      ) : (
+        <>
+          <div className="mono truncate">{out.tx.signature}</div>
+          <div className="text-faint">
+            {out.tx.ok ? "succeeded" : "failed"} · {out.active.length} matching findings
+          </div>
+          <a
+            href={out.explorer}
+            target="_blank"
+            rel="noreferrer"
+            className="mono block truncate text-faint underline decoration-line2 underline-offset-2 hover:text-ink"
+          >
+            {out.tx.digest}
+          </a>
+        </>
+      );
   } else if (isRecall) {
     const out = part.output as RecallOutput;
     const ids = [...(out.active ?? []), ...(out.superseded ?? [])].map((h) => h.memory_id);
@@ -988,7 +1042,7 @@ function LedgerItem({
     <div className="flex flex-col gap-1.5 border-b border-line px-6 py-3.5">
       <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.1em]">
         <span className={isRecall ? "text-muted" : "text-ok"}>
-          {isRecall ? "Recall" : part.type === CONFIRM ? "Confirm" : "Store"}
+          {isRecall ? "Recall" : part.type === INSPECT ? "Chain read" : part.type === CONFIRM ? "Confirm" : "Store"}
         </span>
         <span className="mono tracking-normal text-faint">{time}</span>
       </div>

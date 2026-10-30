@@ -10,6 +10,7 @@ import { getEnv } from "../lib/env";
 import { buildSystemPrompt } from "../lib/sabi-prompt";
 import { todayISO } from "../lib/findings";
 import { defaultNamespace, mode, searchFindings } from "../lib/memwal";
+import { InspectInputSchema, inspectAction } from "../lib/diagnose";
 import {
   ConfirmInputSchema,
   RememberInputSchema,
@@ -75,6 +76,20 @@ export function registerSabi(server: McpServer): void {
       } catch (err) {
         return failure(`recall failed: ${describe(err)}`);
       }
+    },
+  );
+
+  server.registerTool(
+    "inspect_transaction",
+    {
+      title: "Diagnose a Sui transaction",
+      description:
+        "Read a Sui mainnet transaction (via Tatum) and name its failure exactly: abort code, package::module::function, gas. Then recalls community findings for that exact failure. Call FIRST whenever the user shares a transaction digest or an explorer link.",
+      inputSchema: InspectInputSchema.shape,
+    },
+    async (input) => {
+      const res = await inspectAction(input, todayISO());
+      return res.status === "error" ? failure(res.error) : text(res);
     },
   );
 

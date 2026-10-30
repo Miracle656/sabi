@@ -20,6 +20,7 @@ import { DEFAULT_MODEL_ID, isClaudeModel, modelIds } from "@/lib/models";
 import { buildSystemPrompt } from "@/lib/sabi-prompt";
 import { todayISO } from "@/lib/findings";
 import { searchFindings } from "@/lib/memwal";
+import { InspectInputSchema, inspectAction } from "@/lib/diagnose";
 import {
   ConfirmInputSchema,
   RememberInputSchema,
@@ -126,6 +127,12 @@ export async function POST(req: Request) {
           return { query, error: describe(err) };
         }
       },
+    }),
+    inspect_transaction: tool({
+      description:
+        "Read a Sui mainnet transaction (via Tatum) and name its failure exactly: abort code, package::module::function, gas. Then recalls community findings for that exact failure. Call FIRST whenever the user shares a transaction digest or an explorer link.",
+      inputSchema: InspectInputSchema,
+      execute: (input) => inspectAction(input, today),
     }),
     remember_finding: tool({
       description:

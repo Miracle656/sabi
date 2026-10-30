@@ -24,11 +24,16 @@ export interface SabiEnv {
   enokiKey: string;
   /** HMAC key for the session cookie; required whenever sign-in is enabled. */
   sessionSecret: string;
+  /** Tatum API key - enables on-chain reads through Tatum's Sui gRPC gateway. */
+  tatumKey: string;
+  /** host:port of Tatum's Sui gRPC gateway. */
+  tatumSuiGrpc: string;
 }
 
 const DEFAULT_RELAYER = "https://relayer.memory.walrus.xyz";
 const DEFAULT_NAMESPACE = "sabi";
 const DEFAULT_OPENAI_MODELS = "gpt-5,gpt-5-mini";
+const DEFAULT_TATUM_SUI_GRPC = "sui-mainnet-grpc.gateway.tatum.io:443";
 const DEFAULT_GROQ_MODELS = "qwen/qwen3.8-27b,openai/gpt-oss-120b";
 
 function read(name: string): string {
@@ -52,6 +57,8 @@ export function getEnv(): SabiEnv {
     googleClientId: read("GOOGLE_CLIENT_ID") || read("NEXT_PUBLIC_GOOGLE_CLIENT_ID"),
     enokiKey: read("ENOKI_API_KEY"),
     sessionSecret: read("SABI_SESSION_SECRET"),
+    tatumKey: read("TATUM_API_KEY"),
+    tatumSuiGrpc: read("TATUM_SUI_GRPC") || DEFAULT_TATUM_SUI_GRPC,
   };
 }
 

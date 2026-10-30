@@ -51,6 +51,8 @@ const MEMORY_ID = /^[A-Za-z0-9_-]{8,120}$/;
 // What a model sends for an optional string it means to leave empty. These all
 // match MEMORY_ID's alphabet, and "SUPERSEDES:null" reached Walrus on 2026-08-27.
 const NO_MEMORY_ID = /^(null|none|nil|undefined|n\/a|na|-)?$/i;
+// Sui transaction digests: base58, 43-44 characters.
+const TX_DIGEST = /^[1-9A-HJ-NP-Za-km-z]{43,44}$/;
 
 /** A SUPERSEDES value that can actually name a memory. */
 export function isMemoryId(s: string): boolean {
@@ -124,6 +126,18 @@ export const FindingInputSchema = z.object({
         .optional(),
     )
     .describe("memory_id of the active finding this one replaces, if any."),
+  evidence_tx: z
+    .preprocess(
+      (v) => (v == null || (typeof v === "string" && NO_MEMORY_ID.test(v.trim())) ? undefined : v),
+      z
+        .string()
+        .trim()
+        .regex(TX_DIGEST, "evidence_tx must be a Sui transaction digest")
+        .optional(),
+    )
+    .describe(
+      "Digest of a Sui mainnet transaction that shows the issue (e.g. the failed tx). Verified on-chain before storing.",
+    ),
 });
 export type FindingInput = z.infer<typeof FindingInputSchema>;
 
@@ -140,6 +154,8 @@ export interface Finding {
   supersedes?: string;
   /** Set on a confirmation: the memory this re-verifies. */
   confirms?: string;
+  /** A mainnet transaction digest that shows the issue; checked on-chain at write time. */
+  evidence?: string;
 }
 
 const SEP = " → ";
@@ -215,6 +231,8 @@ export function toFinding(
   if (reportedBy) out.reportedBy = reportedBy;
   const supersedes = input.supersedes_memory_id?.trim();
   if (supersedes) out.supersedes = supersedes;
+  const evidence = input.evidence_tx?.trim();
+  if (evidence) out.evidence = evidence;
   return out;
 }
 
@@ -235,6 +253,7 @@ export function formatFinding(f: Finding): string {
   if (f.reportedBy) tail.push(`by:${f.reportedBy}`);
   if (f.supersedes) tail.push(`SUPERSEDES:${f.supersedes}`);
   if (f.confirms) tail.push(`CONFIRMS:${f.confirms}`);
+  if (f.evidence) tail.push(`EVIDENCE:${f.evidence}`);
   return [
     `[${f.category}] ${f.subject}`,
     f.finding,
@@ -303,6 +322,9 @@ export function parseFinding(text: string): Finding | null {
       // pointer that names nothing is no pointer.
       const id = extra.slice("SUPERSEDES:".length).trim();
       if (isMemoryId(id)) out.supersedes = id;
+    } else if (extra.startsWith("EVIDENCE:")) {
+      const d = extra.slice("EVIDENCE:".length).trim();
+      if (TX_DIGEST.test(d)) out.evidence = d;
     } else if (extra.startsWith("CONFIRMS:")) {
       const id = extra.slice("CONFIRMS:".length).trim();
       if (isMemoryId(id)) out.confirms = id;

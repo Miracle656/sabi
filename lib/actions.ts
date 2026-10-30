@@ -16,6 +16,7 @@ import {
 } from "./findings";
 import { explainStoreFailure, findMemory, storeFinding } from "./memwal";
 import { communityIndex, invalidateCommunity } from "./community";
+import { inspectTransaction, tatumEnabled } from "./tatum";
 import {
   LEVELS,
   PROTECTED_AFTER_CONFIRMERS,
@@ -72,6 +73,10 @@ export async function rememberAction(input: RememberInput, ctx: WriteContext): P
       const refusal = await checkSupersede(finding, ctx);
       if (refusal) return fail(refusal);
     }
+    if (finding.evidence) {
+      const refusal = await checkEvidence(finding.evidence);
+      if (refusal) return fail(refusal);
+    }
     const text = formatFinding(finding);
     const res = await storeFinding(text);
     invalidateCommunity(res.namespace);
@@ -79,6 +84,21 @@ export async function rememberAction(input: RememberInput, ctx: WriteContext): P
   } catch (err) {
     return fail(await explainStoreFailure(err));
   }
+}
+
+/**
+ * EVIDENCE is a claim that this transaction exists on mainnet. It goes into
+ * append-only storage with a badge, so it is checked on-chain first.
+ */
+async function checkEvidence(digest: string): Promise<string | null> {
+  if (!tatumEnabled()) {
+    return "Refused: evidence_tx can't be verified on this instance (no TATUM_API_KEY). Store the finding without it.";
+  }
+  const tx = await inspectTransaction(digest);
+  if (!tx) {
+    return `Refused: evidence_tx ${digest} is not a transaction on Sui mainnet. Check the digest, or store the finding without it.`;
+  }
+  return null;
 }
 
 /**

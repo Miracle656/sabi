@@ -8,6 +8,7 @@ import {
   type RecalledFinding,
 } from "@/lib/findings";
 import { aggregatorUrl, profileHref, walruscanUrl, type Network } from "@/lib/links";
+import { shortId, suiscanTx, type TxReport } from "@/lib/onchain";
 
 // ── who is looking ──────────────────────────────────────────────────────────
 
@@ -265,9 +266,118 @@ export function FindingCard({
         {f.confirms && (
           <div className="mono text-[11.5px] text-faint">confirms {f.confirms}</div>
         )}
+        {f.evidence && <EvidenceLink digest={f.evidence} />}
         {hit.superseded_by && (
           <div className="mono text-[11.5px] text-faint">replaced by {hit.superseded_by}</div>
         )}
+      </div>
+    </article>
+  );
+}
+
+/** A finding's on-chain evidence: a mainnet transaction, checked when it was stored. */
+function EvidenceLink({ digest }: { digest: string }) {
+  return (
+    <a
+      href={suiscanTx(digest)}
+      target="_blank"
+      rel="noreferrer"
+      title="This transaction was read from Sui mainnet (via Tatum) before the finding was stored"
+      className="inline-flex w-fit items-center gap-1.5 rounded-full border border-line2 px-2.5 py-1 text-[11.5px] text-muted transition-colors hover:border-ink hover:text-ink"
+    >
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" strokeWidth="2" aria-hidden="true">
+        <path d="M20 6L9 17l-5-5" />
+      </svg>
+      On-chain evidence
+      <span className="mono text-faint">{digest.slice(0, 6)}…{digest.slice(-4)}</span>
+    </a>
+  );
+}
+
+// ── a transaction, as the chain reports it ──────────────────────────────────
+
+export function TxCard({
+  tx,
+  gasSui,
+  explorer,
+}: {
+  tx: Omit<TxReport, "calls"> & { calls: string[]; moreCalls?: number };
+  gasSui?: string;
+  explorer: string;
+}) {
+  const failed = !tx.ok;
+  const f = tx.failure;
+  return (
+    <article className="enter grid grid-cols-[3px_1fr] overflow-hidden rounded-[var(--r)] border border-line bg-surface2">
+      <div style={{ background: failed ? "var(--bad)" : "var(--ok)" }} />
+      <div className="flex flex-col gap-2.5 px-4 py-3.5">
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+          <span className={`eyebrow ${failed ? "text-bad" : "text-ok"}`}>
+            {failed ? "Failed on-chain" : "Succeeded on-chain"}
+          </span>
+          <span className="mono text-[12px] text-faint">Sui mainnet · read via Tatum</span>
+          <span className="grow" />
+          <a
+            href={explorer}
+            target="_blank"
+            rel="noreferrer"
+            className="mono text-[11.5px] text-muted underline decoration-line2 underline-offset-2 hover:text-ink"
+          >
+            {tx.digest.slice(0, 8)}…{tx.digest.slice(-4)} ↗
+          </a>
+        </div>
+
+        <p className="mono text-[14px] leading-relaxed text-ink [overflow-wrap:anywhere]">{tx.signature}</p>
+
+        {f && (f.abortCode !== undefined || f.module) && (
+          <dl className="nums grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[12.5px]">
+            {f.abortCode !== undefined && (
+              <>
+                <dt className="text-faint">abort code</dt>
+                <dd className="mono">{f.abortCode}</dd>
+              </>
+            )}
+            {f.package && (
+              <>
+                <dt className="text-faint">raised in</dt>
+                <dd className="mono [overflow-wrap:anywhere]">
+                  {shortId(f.package)}::{f.module}
+                  {f.function ? `::${f.function}` : ""}
+                </dd>
+              </>
+            )}
+            {f.command !== undefined && (
+              <>
+                <dt className="text-faint">command</dt>
+                <dd className="mono">#{f.command}</dd>
+              </>
+            )}
+          </dl>
+        )}
+
+        {tx.calls.length > 0 && (
+          <details className="group text-[12.5px]">
+            <summary className="cursor-pointer list-none text-faint hover:text-muted">
+              {tx.calls.length + (tx.moreCalls ?? 0)} Move calls
+            </summary>
+            <ol className="mono mt-2 flex flex-col gap-1 text-[11.5px] text-muted">
+              {tx.calls.map((c, i) => {
+                const [pkg, mod, fn] = c.split("::");
+                return (
+                  <li key={i} className={f?.command === i ? "text-bad" : ""}>
+                    {i}. {shortId(pkg)}::{mod}::{fn}
+                  </li>
+                );
+              })}
+              {(tx.moreCalls ?? 0) > 0 && <li className="text-faint">+{tx.moreCalls} more</li>}
+            </ol>
+          </details>
+        )}
+
+        <div className="nums flex flex-wrap items-center gap-x-3.5 gap-y-1 border-t border-line pt-2.5 text-[12px] text-faint">
+          {tx.sender && <span className="mono">from {shortId(tx.sender)}</span>}
+          {gasSui && <span>gas paid {gasSui} SUI</span>}
+        </div>
       </div>
     </article>
   );
